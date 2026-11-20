@@ -329,3 +329,6 @@
 -            'historical_symbols': len(grouped), 'method': 'hourly_pattern_analogs_v2_directional'}
 +            'historical_symbols': len(grouped), 'method': 'hourly_pattern_analogs_v2_directional',
 +            'archive_quality': archive_quality}
+
+
+ def record_feedback(items: list[dict], snapshots: dict | None = None, now: float | None = None) -> dict:
