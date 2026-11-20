@@ -354,7 +354,8 @@ def init_db(*, backfill_learning: bool = True) -> None:
                 WHERE t.status='CLOSED' AND e.trade_id IS NULL""").fetchall()
             for trade in missing:
                 _record_learning_event(c, trade, legacy=True)
-            if missing:
+            repaired_legacy = _repair_legacy_funding_learning_events(c)
+            if missing or repaired_legacy:
                 _rebuild_learning_profiles_conn(c)
             else:
                 event_count = int(c.execute("SELECT COUNT(*) FROM paper_learning_events").fetchone()[0] or 0)
@@ -370,6 +371,123 @@ def _safe_json_object(value: Any) -> dict:
     except (TypeError, ValueError):
         return {}
 
+
+
+def _repair_legacy_funding_learning_events(c: sqlite3.Connection, trade_id: int | None = None) -> int:
+    """Repair only provably stale v1 learning outcomes after funding reconciliation.
+
+    The migration is intentionally narrow and idempotent. It never changes the
+    trade ledger or funding evidence; it only corrects the derived learning row.
+    """
+    sql = """
+        SELECT
+            t.id, t.market, t.status, t.funding_status, t.funding_total,
+            t.funding_event_count, t.opened_at, t.closed_at, t.net_pnl,
+            t.gross_pnl, t.entry_fee, t.exit_fee, t.notional,
+            t.entry_fill, t.exit_fill,
+            e.closed_at AS event_closed_at, e.net_pnl AS event_net_pnl,
+            e.gross_pnl AS event_gross_pnl, e.total_fees AS event_total_fees,
+            e.notional AS event_notional, e.return_pct AS event_return_pct,
+            e.entry_fill AS event_entry_fill, e.exit_fill AS event_exit_fill,
+            e.context_json AS event_context_json,
+            COALESCE(f.cashflow_total, 0.0) AS evidence_funding_total,
+            COALESCE(f.event_count, 0) AS evidence_event_count
+        FROM paper_live_trades t
+        JOIN paper_learning_events e ON e.trade_id=t.id
+        LEFT JOIN (
+            SELECT trade_id, SUM(cashflow) AS cashflow_total, COUNT(*) AS event_count
+            FROM paper_funding_events GROUP BY trade_id
+        ) f ON f.trade_id=t.id
+        WHERE t.status='CLOSED' AND t.market='perp'
+          AND t.funding_status='SYNCED'
+    """
+    args: tuple = ()
+    if trade_id is not None:
+        sql += " AND t.id=?"
+        args = (int(trade_id),)
+
+    rows = c.execute(sql, args).fetchall()
+    repaired = 0
+
+    def close(a: Any, b: Any) -> bool:
+        try:
+            return math.isclose(float(a), float(b), rel_tol=1e-9, abs_tol=1e-8)
+        except (TypeError, ValueError):
+            return False
+
+    for row in rows:
+        context = _safe_json_object(row["event_context_json"])
+        migration = context.get("funding_learning_migration")
+        if isinstance(migration, dict) and migration.get("migration") == "signed-funding-v1-to-v2":
+            continue
+        if context.get("learning_version") != "paper-trade-outcome-v1":
+            continue
+
+        funding = float(row["funding_total"] or 0.0)
+        trade_net = float(row["net_pnl"] or 0.0)
+        event_net = float(row["event_net_pnl"] or 0.0)
+        notional = float(row["notional"] or 0.0)
+        gross = float(row["gross_pnl"] or 0.0)
+        entry_fee = float(row["entry_fee"] or 0.0)
+        exit_fee = float(row["exit_fee"] or 0.0)
+        if notional <= 0 or row["closed_at"] is None:
+            continue
+
+        # Require complete and independently persisted funding evidence.
+        if not close(row["evidence_funding_total"], funding):
+            continue
+        if int(row["evidence_event_count"] or 0) != int(row["funding_event_count"] or 0):
+            continue
+        if int(row["evidence_event_count"] or 0) <= 0:
+            continue
+
+        # The trade ledger itself must satisfy the canonical signed-cashflow identity.
+        canonical_net = gross - entry_fee - exit_fee + funding
+        if not close(trade_net, canonical_net):
+            continue
+
+        # Prove this is the specific legacy defect: event PnL omitted signed funding.
+        if not close(trade_net - event_net, funding):
+            continue
+        if not close(row["event_gross_pnl"], gross):
+            continue
+        if not close(row["event_notional"], notional):
+            continue
+        if not close(row["event_entry_fill"], row["entry_fill"]):
+            continue
+        if not close(row["event_exit_fill"], row["exit_fill"]):
+            continue
+        if not close(row["event_closed_at"], row["closed_at"]):
+            continue
+
+        corrected_fees = entry_fee + exit_fee - funding
+        corrected_return = canonical_net / notional * 100.0
+        context["funding_learning_migration"] = {
+            "migration": "signed-funding-v1-to-v2",
+            "reason": "Legacy learning outcome omitted signed funding cashflow",
+            "old_net_pnl": event_net,
+            "corrected_net_pnl": canonical_net,
+            "funding_total": funding,
+            "old_total_fees": float(row["event_total_fees"] or 0.0),
+            "corrected_total_fees": corrected_fees,
+            "evidence_event_count": int(row["evidence_event_count"]),
+        }
+        c.execute(
+            """UPDATE paper_learning_events
+               SET outcome=?, net_pnl=?, return_pct=?, total_fees=?, context_json=?
+               WHERE trade_id=?""",
+            (
+                1 if canonical_net > 0 else 0,
+                canonical_net,
+                corrected_return,
+                corrected_fees,
+                json.dumps(context, ensure_ascii=False, sort_keys=True),
+                int(row["id"]),
+            ),
+        )
+        repaired += 1
+
+    return repaired
 
 def _sanitize_decision_context(value: Any, *, depth: int = 0) -> Any:
     """Bound and normalize model/indicator context before storing it in SQLite."""
@@ -918,6 +1036,7 @@ def sync_open_funding_positions(trade_id: int | None = None, *, force: bool = Fa
                     latest_trade = c.execute("SELECT * FROM paper_live_trades WHERE id=?", (tid,)).fetchone()
                     if status == "SYNCED":
                         _record_learning_event(c, latest_trade)
+                        _repair_legacy_funding_learning_events(c, trade_id=tid)
                         _rebuild_learning_profiles_conn(c)
                 inserted_total += added
                 synced += 1
