@@ -1,6 +1,6 @@
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
-@@ -190,33 +190,74 @@
+@@ -190,43 +190,84 @@
          "study_basis": [
 -            "John J. Murphy: trend, support/resistance, chart patterns, volume",
 -            "Steve Nison: candlestick formations combined with broader technical context",
@@ -64,7 +64,17 @@
                     "Evaluate label distributions, class balance, event frequency, resolution time and implied turnover; a label definition changes the economic task, not just the target column.",
                     "Use trend-scanning or path-dependent labels only when their variable horizon is compatible with the strategy's execution and portfolio holding rules.",
                     "For MFE/MAE measured from a close(t) entry, begin the forward excursion at t+1; the entry bar's high and low occurred before the close fill.",
-                    "Keep label construction point-in-time and fold-aware; thresholds, scalers and adaptive barrier parameters must be estimated only from information available in the training period."]},
+                    "Keep label construction point-in-time and fold-aware; thresholds, scalers and adaptive barrier parameters must be estimated only from information available in the training period.",
+                    "Run data-quality diagnostics before cleaning; distinguish missingness, stale observations, duplicates, bad timestamps and genuine market extremes instead of applying blind global cleanup.",
+                    "Fit imputers, scalers, encoders, clipping thresholds and winsorization bounds on each training fold only; freeze those fitted parameters when transforming its validation and test windows.",
+                    "Treat missing values as an explicit data state, not as zero; preserve missingness indicators when absence may carry information and document the reason and policy for each field.",
+                    "Use forward fill only when the field is legitimately persistent and its value was already observable; impose a defensible staleness limit and never backfill from future observations.",
+                    "Separate corrupt ticks or impossible records from genuine tail events; do not delete or clip extreme market moves merely because they are statistically unusual.",
+                    "If robust scaling, clipping or winsorization is justified, estimate its parameters from training data only and record the transformation so tail behavior remains auditable.",
+                    "Fit categorical vocabularies and encodings within training folds; define a safe unknown-category behavior for symbols, venues and instrument metadata first seen later.",
+                    "Apply rolling imputations and normalizations per instrument where the economic meaning is instrument-specific; compute cross-sectional transforms only within the contemporaneous eligible universe.",
+                    "Keep raw source values immutable and retain transformation lineage, timestamps, units and missingness reasons so downstream brains can trace each derived value.",
+                    "Avoid centered windows, global full-sample statistics and any preprocessing step that uses observations later than the simulated decision time."]},
 +            ],
 +            "shared_decision_protocol": [
 +                "Analyze independently with the receiving brain's existing model.",
