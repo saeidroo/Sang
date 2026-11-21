@@ -7,7 +7,7 @@
 - شاخهٔ اصلی: main (دست‌نخورده)
 - شاخهٔ کاری فعال: fix/v156-cross-timeframe-brain-bus
 - سورس اجرایی مبنا: V23.0.170؛ ZIP ورودی با SHA-256 ثبت‌شده در گزارش V199.
-- بستهٔ V23.0.199 و patch آن به‌صورت artifact گفتگو تحویل شده‌اند؛ این مخزن گزارش‌ها و checksum را نگه می‌دارد، نه باینری ZIP.
+- بستهٔ نهایی V23.0.199 و patch آن artifact گفتگو هستند؛ مخزن گزارش‌ها و checksum را نگه می‌دارد، نه باینری ZIP.
 
 ## نتیجهٔ V23.0.199
 - پروفایل‌های aggregate معاملات بسته‌شده از paper_live به Knowledge Bus موجود منتشر می‌شوند.
@@ -16,8 +16,9 @@
 - raw trade IDs، fills و total PnL خام منتشر نمی‌شوند.
 - scoring، ranking، confidence، risk و order behavior تغییر نکرده‌اند.
 - PAPER ONLY برقرار است؛ معاملهٔ زنده فعال نشده است.
-- راستی‌آزمایی نهایی: ZIP سالم؛ 1,076 checksum بدون مغایرت؛ 92 آزمون هدفمند موفق و 1 آزمون Skip.
-- بنر install.bat نیز با APP_VERSION برابر V23.0.199 شد.
+- QA نهایی: ZIP سالم؛ 1,125 فایل Manifest بدون مغایرت؛ 95 آزمون هدفمند موفق و 1 آزمون Skip.
+- py_compile برای 9 فایل Python موفق؛ Patch dry-run موفق.
+- بنر install.bat و تست قرارداد نسخه با V23.0.199 هماهنگ شدند.
 
 ## اسناد
 - docs/audits/V171_V199_EXECUTION_LOG_FA.md
