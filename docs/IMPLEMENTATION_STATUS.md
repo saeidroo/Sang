@@ -6,7 +6,7 @@
 - مخزن: saeidroo/Sang
 - شاخهٔ اصلی: main (دست‌نخورده)
 - شاخهٔ کاری فعال: fix/v156-cross-timeframe-brain-bus
-- سورس اجرایی مبنا: V23.0.170؛ بسته‌های V199 تا V203 بر پایهٔ همان سورس واقعی و زنجیرهٔ بسته‌های تأییدشده ساخته شده‌اند.
+- سورس اجرایی مبنا: V23.0.170؛ بسته‌های V199 تا V204 بر پایهٔ همان سورس واقعی و زنجیرهٔ بسته‌های تأییدشده ساخته شده‌اند.
 - ZIPها و patchها artifact گفتگو هستند؛ GitHub گزارش‌ها و checksumها را نگه می‌دارد، نه باینری ZIP.
 
 ## نتیجهٔ V23.0.199
@@ -57,6 +57,17 @@
 - فقط ممیزی read-only؛ PAPER ONLY و بدون تغییر وزن/امتیاز/ریسک/اجرا.
 - گزارش: docs/audits/V203_BUILD_REPORT_FA.md
 
+
+## نتیجهٔ V23.0.204
+- تابع اختصاصی recall_matured_paper_outcomes از Knowledge Bus موجود، aggregateهای بالغ‌شدهٔ موفقیت/شکست را مستقل از سقف عمومی peer recall بازیابی می‌کند.
+- فقط packetهای matured_paper_outcomes با جهت NEUTRAL و پرچم‌های advisory معتبر پذیرفته می‌شوند.
+- Historical Market Brain، AutoPilot و Scout این تجربه‌ها را در context ممیزی/یادگیری دریافت یا آشکار می‌کنند.
+- هیچ جدول، brain یا سرویس جدیدی اضافه نشد؛ هیچ اثر امتیازی، confidence، وزن مدل، ریسک یا اجرای سفارش ایجاد نمی‌شود.
+- تست اصلی: 55 passed؛ تست تکمیلی: 48 passed؛ py_compile و patch dry-run موفق؛ ZIP سالم با 1,090 فایل.
+- Full suite اجرا نشده است؛ اتصال runtime همهٔ مغزها اثبات نشده است.
+- PAPER ONLY؛ معاملهٔ زنده فعال نشده است.
+- گزارش: docs/audits/V204_BUILD_REPORT_FA.md
+
 ## ممیزی پوشش Knowledge Bus
 - ممیزی ایستای V199 پنج مسیر مصرف مستقیم را تأیید کرد؛ پوشش تمام ماژول‌های مغزی هنوز اثبات نشده است.
 - brain.py helper است و records را از caller می‌گیرد؛ مصرف‌کنندهٔ مستقل recall نیست.
@@ -77,9 +88,11 @@
 - docs/audits/V202_RELEASE_ARTIFACT_SHA256.txt
 - docs/audits/V203_BUILD_REPORT_FA.md
 - docs/audits/V203_RELEASE_ARTIFACT_SHA256.txt
+- docs/audits/V204_BUILD_REPORT_FA.md
+- docs/audits/V204_RELEASE_ARTIFACT_SHA256.txt
 
 ## موارد باز
-- اجرای V203 در محیط نصب‌شدهٔ کاربر و اجرای کامل suite با dependencies نصب‌شده.
+- اجرای V204 در محیط نصب‌شدهٔ کاربر و اجرای کامل suite با dependencies نصب‌شده.
 - اثبات runtime در دادهٔ عملیاتی و بررسی دیتابیس‌های واقعی.
 - تکمیل پوشش مصرف‌کننده‌ها در مغزهای مستقل باقی‌مانده، پس از تعیین نقش واقعی هر ماژول.
 - تست یکپارچهٔ stale/duplicate و تفکیک خطای Bus از نبود شواهد در تمام consumerها.
