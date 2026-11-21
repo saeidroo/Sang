@@ -19,7 +19,7 @@
 
 ## قواعد عملی استخراج‌شده
 
-۵۴ قاعده جدید به همان curriculum موجود اضافه شد. محورهای کلیدی:
+۵۴ قاعده عملی جدید به همان curriculum موجود اضافه شد. محورهای کلیدی:
 1. VaR در برابر ES/CVaR، آزمون exceedance، tail uncertainty و regime conditioning.
 2. Drawdown depth/duration/recovery و خطر مسیر واقعی equity.
 3. Stop-loss، trailing، ATR، MAE/MFE و position sizing بدون leakage.
