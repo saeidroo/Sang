@@ -404,7 +404,7 @@
 +                "Use net-of-cost, capacity-aware, out-of-sample evidence before promoting a strategy; cost-model improvements cannot be used to retroactively rescue a weak signal.",
 +                "Precommit cost guardrails and kill criteria such as maximum implementation shortfall, minimum net edge, participation ceiling and persistent cost-model error.",
 +                "Keep chapter-derived cost rules advisory until independently tested against the project's own venue, instrument and fill data; do not activate live orders or alter risk automatically."
-++            {"source": "Stefan Jansen — Machine Learning for Trading, Chapter 19: Risk Management", "principles": [
++            {"source": "Stefan Jansen — Machine Learning for Trading, Chapter 19: Risk Management", "principles": [
 +                "Treat risk management as a predeclared system design layer with limits, escalation paths, owners, evidence and audit records; do not add controls only after observing a backtest failure.",
 +                "Define a risk taxonomy before measurement: market, factor, sector, geographic, macro, liquidity, leverage, counterparty, model, operational and execution risks.",
 +                "Distinguish forecast risk, realized portfolio loss, path risk and operational failure; one scalar volatility estimate cannot represent all of them.",
