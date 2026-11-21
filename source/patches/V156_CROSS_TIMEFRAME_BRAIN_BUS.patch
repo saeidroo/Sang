@@ -121,21 +121,12 @@ diff --git a/tests/test_v23_0_155_price_action_learning.py b/tests/test_v23_0_15
 index d7b3d75..a19cd11 100644
 --- a/tests/test_v23_0_155_price_action_learning.py
 +++ b/tests/test_v23_0_155_price_action_learning.py
-@@ -76,7 +76,7 @@ def test_price_action_brain_publishes_and_reads_shared_context(tmp_path, monkeyp
-     monkeypatch.setattr(knowledge_bus, "_db_path", lambda: tmp_path / "knowledge.sqlite3")
-     monkeypatch.setattr(knowledge_bus.time, "time", lambda: 1_800_000_100)
-     knowledge_bus.publish_knowledge(
--        symbol="BTCUSDT", market="spot", timeframe="1h",
-+        symbol="BTCUSDT", market="spot", timeframe="15m",
-         source_brain="historical_market_brain", knowledge_type="historical_analogs",
-         direction="BULLISH", observed_at=1_800_000_090,
-         payload={"analogs": 12},
 @@ -99,6 +99,10 @@ def test_price_action_brain_publishes_and_reads_shared_context(tmp_path, monkeypatch
      packet = by_source["price_action_learning"]["payload"]
      assert by_source["price_action_learning"]["observed_at"] == 1_800_000_095
      assert packet["shared_context"]["sources"] == ["historical_market_brain"]
 +    assert packet["shared_context"]["evidence"] == [{
-+        "source_brain": "historical_market_brain", "timeframe": "15m",
++        "source_brain": "historical_market_brain", "timeframe": "1h",
 +        "knowledge_type": "historical_analogs", "direction": "BULLISH",
 +    }]
      assert packet["signal_or_risk_effect"] is False
