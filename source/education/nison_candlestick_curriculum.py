@@ -14,7 +14,7 @@ SOURCE = {"author": "Steve Nison", "title": "Japanese Candlestick Charting Techn
 # Source-inspected details from OCR-checked scan pages; concise original paraphrase.
 INSPECTED_LESSONS = {
     3: {
-        "printed_pages": "25-28",
+        "printed_pages": "25-29",
         "rules": [
             "The real body is the open-to-close interval; its direction distinguishes a higher close from a lower close.",
             "Upper and lower shadows extend from the real body to the session high and low.",
@@ -23,9 +23,14 @@ INSPECTED_LESSONS = {
             "A spinning top after an extended directional move warns of weakening control, not a confirmed reversal.",
             "A doji has an open and close that are equal or nearly equal; interpret it as indecision and require context.",
             "Candles are valid on intraday, daily and weekly intervals; interpret each candle using its own interval.",
-            "A candle warning gains context when it coincides with meaningful support or resistance."
+            "A candle warning gains context when it coincides with meaningful support or resistance.",
+            "The open is an early, provisional view of the market battle; it does not by itself describe the final outcome.",
+            "The close is a pivotal completed price: technicians may use it to confirm a breakout beyond a significant chart level.",
+            "Some technical systems, including moving-average systems, calculate their values from closing prices; the close therefore has practical analytical importance.",
+            "The source describes unusually large orders intended to influence the close as a night attack, and comparable orders at the open as a morning attack.",
+            "Candle-pattern names are mnemonic descriptions of market emotion; for example, dark-cloud cover is described as bearish, evening star as bearish, and morning star as bullish."
         ],
-        "evidence_pages": ["PDF 36-39; printed 25-28"]
+        "evidence_pages": ["PDF 36-40; printed 25-29"]
     }
 }
 
