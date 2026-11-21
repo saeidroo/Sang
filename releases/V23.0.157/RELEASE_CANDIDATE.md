@@ -51,3 +51,14 @@ A further repository scan found the branch `fix/v153-market-feeds-and-brain-stat
 This hotfix is **not** the missing V154–V156 source history and is not evidence that the V157 patch applies cleanly to V153. The repository scan still found no verified V154, V155 or V156 branch/commit/PR snapshot. Keep the V157 candidate unapplied until the exact V156 base is recovered or compatibility is demonstrated with a clean patch check.
 
 The hotfix branch has not been merged, and the default branch has not been changed.
+
+
+## Follow-up audit — patchset contents and base safety (2026-11-21)
+
+The branch inventory was paginated to completion: seven branches were returned and no additional branch page remained. No verified V154, V155 or V156 ref was found in that inventory or in the repository code searches performed during this audit.
+
+The V153 hotfix branch comparison confirms exactly 14 added paths: 12 compressed patch files, one patch README, and a standalone 2,642-line `backend/paper_live.py`. It does **not** contain a tracked full-source ZIP in the branch diff. Although its README says a fixed ZIP is supplied separately, that ZIP is not present among the tracked changes returned by GitHub. The standalone Paper file is not part of the market-feed patch sequence and must not be copied into the V153 tree without a separate compatibility and regression review.
+
+The patchset README identifies the intended target as the original V23.0.153 source archive (whose internal folder name is `TradingSignalAIPro_V23.0.152_AUDIT`). It prescribes ordered decompression and `git apply --check` before application. Since the complete target source tree is not available in this GitHub branch, no honest patch dry-run or source-level test can be claimed here. No patch was applied, no PR was merged, and `main` remains untouched.
+
+**Next required input for source-level integration:** the exact V23.0.156 source archive (or a verified Git ref containing it). Once available, check the V153 market-feed patchset against its actual files, then assess the V157 patch separately against the same base. Keep all changes PAPER ONLY.
