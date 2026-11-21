@@ -1,0 +1,59 @@
+--- a/backend/price_action_learning.py
++++ b/backend/price_action_learning.py
+@@ -216,7 +216,8 @@
+ 
+     shared = recall_knowledge(symbol, market=market, timeframe=timeframe, limit=8,
+                               exclude_sources="price_action_learning",
+-                              max_age_seconds=7 * 24 * 3600)
++                              max_age_seconds=7 * 24 * 3600,
++                              include_other_timeframes=True)
+     packet = build_price_action_packet(candles=candles, analyses=analyses,
+                                        shared_records=shared)
+     trend = packet.get("trend", "NEUTRAL")
+--- a/tests/test_v23_0_156_price_action_validation.py
++++ b/tests/test_v23_0_156_price_action_validation.py
+@@ -144,3 +144,44 @@
+     records = knowledge_bus.recall_knowledge(
+         "BTCUSDT", market="any", timeframe="4h", max_age_seconds=None)
+     assert any(x["source_brain"] == "price_action_validation" for x in records)
++
++
++def test_processor_status_exposes_live_heartbeat_and_paper_safety(monkeypatch):
++    import time
++    from backend import price_action_learning as learning
++
++    class AliveThread:
++        def is_alive(self):
++            return True
++
++    monkeypatch.setattr(learning, "_PA_AUDIT_THREAD", AliveThread())
++    monkeypatch.setattr(learning, "_PA_AUDIT_STATE", {
++        "status": "running", "stage": "scanning_archive", "heartbeat_at": time.time(),
++        "signal_or_risk_effect": False, "real_orders_enabled": False,
++    })
++    state = learning.price_action_archive_validation_status()
++    assert state["worker_alive"] is True
++    assert state["liveness"] == "active"
++    assert state["heartbeat_stale"] is False
++    assert state["heartbeat_age_seconds"] < 2
++    assert state["real_orders_enabled"] is False
++    assert state["signal_or_risk_effect"] is False
++
++
++def test_processor_status_marks_stale_heartbeat_separately_from_thread_alive(monkeypatch):
++    import time
++    from backend import price_action_learning as learning
++
++    class AliveThread:
++        def is_alive(self):
++            return True
++
++    monkeypatch.setattr(learning, "_PA_AUDIT_THREAD", AliveThread())
++    monkeypatch.setattr(learning, "_PA_AUDIT_STATE", {
++        "status": "running", "stage": "scanning_archive",
++        "heartbeat_at": time.time() - learning._PA_HEARTBEAT_STALE_AFTER_SECONDS - 5,
++    })
++    state = learning.price_action_archive_validation_status()
++    assert state["worker_alive"] is True
++    assert state["liveness"] == "stale"
++    assert state["heartbeat_stale"] is True
