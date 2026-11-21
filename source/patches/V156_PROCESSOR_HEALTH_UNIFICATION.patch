@@ -1,0 +1,341 @@
+--- a/backend/market_brain.py
++++ b/backend/market_brain.py
+@@ -45,7 +45,8 @@
+     'duplicate_timestamp_groups': 0, 'gap_breaks': 0, 'segments': 0,
+     'cache_hit': False, 'error': None, 'rerun_requested': False,
+     'archive_inventory': {}, 'candles_truncated': False,
+-    'per_symbol_candle_limit': 0, 'service_state': 'dormant'
++    'per_symbol_candle_limit': 0, 'service_state': 'dormant',
++    'heartbeat_ts': None, 'worker_started_ts': None, 'worker_finished_ts': None
+ }
+ _STARTUP_LOCK = __import__('threading').RLock()
+ _STARTUP_RERUN_REQUESTED = False
+@@ -467,6 +468,11 @@
+         payload = dict(_STARTUP_STATE)
+         payload['archive_inventory'] = dict(_STARTUP_STATE.get('archive_inventory') or {})
+         payload['worker_alive'] = bool(_STARTUP_WORKER and getattr(_STARTUP_WORKER, 'is_alive', lambda: True)())
++        heartbeat = payload.get('heartbeat_ts')
++        age = max(0.0, time.time() - float(heartbeat)) if heartbeat else None
++        payload['heartbeat_age_seconds'] = round(age, 1) if age is not None else None
++        payload['heartbeat_stale'] = bool(age is not None and age > 180 and payload['worker_alive'])
++        payload['processor_state'] = ('stale' if payload['heartbeat_stale'] else 'active') if payload['worker_alive'] else ('stopped' if payload.get('worker_finished_ts') else 'not_started')
+         if payload['worker_alive']:
+             payload['service_state'] = 'awake'
+         elif payload.get('status') in ('completed', 'completed_cached'):
+@@ -488,7 +494,7 @@
+         _STARTUP_STATE.update(status='running', stage='checking_cache', progress_pct=1,
+                               symbols_done=0, symbols_total=0, workers=0,
+                               accelerator='numpy' if _np is not None else 'python',
+-                              started_ts=now, finished_ts=None, symbols=0, candles=0,
++                              started_ts=now, finished_ts=None, heartbeat_ts=now, symbols=0, candles=0,
+                               pump_events=0, dump_events=0, patterns=0, invalid_rows=0,
+                               duplicate_timestamp_groups=0, gap_breaks=0, segments=0,
+                               cache_hit=False, error=None, rerun_requested=False,
+@@ -542,7 +548,7 @@
+         finally:
+             cache.close()
+         with _STARTUP_LOCK:
+-            _STARTUP_STATE.update(stage='loading_archive', progress_pct=5)
++            _STARTUP_STATE.update(stage='loading_archive', progress_pct=5, heartbeat_ts=time.time())
+         con = sqlite3.connect(HISTORY_DB_PATH.resolve().as_uri() + '?mode=ro', uri=True, timeout=5)
+         try:
+             con.execute('PRAGMA query_only=ON')
+@@ -587,7 +593,7 @@
+         candles = quality['valid_candles']
+         workers = _learning_worker_count(len(grouped)) if _np is not None else 1
+         with _STARTUP_LOCK:
+-            _STARTUP_STATE.update(stage='scanning_patterns', progress_pct=15,
++            _STARTUP_STATE.update(stage='scanning_patterns', progress_pct=15, heartbeat_ts=time.time(),
+                                   symbols_total=len(grouped), symbols_done=0, workers=workers,
+                                   candles_truncated=candles_truncated,
+                                   per_symbol_candle_limit=per_symbol_limit)
+@@ -602,7 +608,7 @@
+                         pattern_counts[signature]['pump'] += values[0]
+                         pattern_counts[signature]['dump'] += values[1]
+                     with _STARTUP_LOCK:
+-                        _STARTUP_STATE.update(symbols_done=done,
++                        _STARTUP_STATE.update(symbols_done=done, heartbeat_ts=time.time(),
+                             progress_pct=15 + int(75 * done / max(1, len(symbol_groups))))
+         else:
+             for done, symbol_segments in enumerate(symbol_groups, 1):
+@@ -613,10 +619,10 @@
+                     pattern_counts[signature]['pump'] += values[1]
+                 with _STARTUP_LOCK:
+-                    _STARTUP_STATE.update(symbols_done=done,
++                    _STARTUP_STATE.update(symbols_done=done, heartbeat_ts=time.time(),
+                         progress_pct=15 + int(75 * done / max(1, len(symbol_groups))))
+         with _STARTUP_LOCK:
+-            _STARTUP_STATE.update(stage='saving_cache', progress_pct=95)
++            _STARTUP_STATE.update(stage='saving_cache', progress_pct=95, heartbeat_ts=time.time())
+         cache = sqlite3.connect(str(FEEDBACK_DB_PATH), timeout=5)
+         try:
+             cache.execute('DELETE FROM brain_historical_patterns')
+@@ -636,7 +642,7 @@
+         with _STARTUP_LOCK:
+             _STARTUP_STATE.update(status='completed', stage='complete', progress_pct=100,
+                 symbols_done=len(grouped), symbols_total=len(grouped),
+-                finished_ts=time.time(), symbols=len(grouped), candles=candles, pump_events=pumps,
++                finished_ts=time.time(), heartbeat_ts=time.time(), symbols=len(grouped), candles=candles, pump_events=pumps,
+                 dump_events=dumps, patterns=len(pattern_counts),
+                 invalid_rows=quality['invalid_rows'],
+                 duplicate_timestamp_groups=quality['duplicate_timestamp_groups'],
+@@ -646,7 +652,7 @@
+             return dict(_STARTUP_STATE)
+     except Exception as exc:
+         with _STARTUP_LOCK:
+-            _STARTUP_STATE.update(status='error', stage='error', progress_pct=0, finished_ts=time.time(), error=str(exc)[:180])
++            _STARTUP_STATE.update(status='error', stage='error', progress_pct=0, finished_ts=time.time(), heartbeat_ts=time.time(), error=str(exc)[:180])
+             return dict(_STARTUP_STATE)
+ 
+ 
+@@ -665,6 +671,8 @@
+                                       error=None, finished_ts=None)
+                 continue
+             _STARTUP_STATE['rerun_requested'] = False
++            _STARTUP_STATE['worker_finished_ts'] = time.time()
++            _STARTUP_STATE['heartbeat_ts'] = time.time()
+             return
+ 
+ 
+@@ -679,7 +687,7 @@
+             return False
+         _STARTUP_RERUN_REQUESTED = False
+         _STARTUP_STATE.update(status='starting', stage='starting_worker', progress_pct=0,
+-                              started_ts=time.time(), finished_ts=None, error=None,
++                              started_ts=time.time(), worker_started_ts=time.time(), worker_finished_ts=None, heartbeat_ts=time.time(), finished_ts=None, error=None,
+                               rerun_requested=False)
+         try:
+             worker = threading.Thread(target=_startup_learning_worker_loop,
+@@ -688,7 +696,7 @@
+             worker.start()
+         except Exception as exc:
+             _STARTUP_STATE.update(status='error', stage='error', progress_pct=0,
+-                                  finished_ts=time.time(), error=str(exc)[:180])
++                                  finished_ts=time.time(), heartbeat_ts=time.time(), error=str(exc)[:180])
+             return False
+         return True
+ 
+--- a/backend/historical.py
++++ b/backend/historical.py
+@@ -39,10 +39,13 @@
+ DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+ _LOCK = threading.RLock()
+ _STOP = threading.Event()
++_WORKER = None
++_HEARTBEAT_STALE_SECONDS = 180
+ _STATUS = {'running': False, 'status': 'idle', 'cancelled': False, 'symbol': None, 'timeframe': None,
+            'downloaded': 0, 'total_requests': 0, 'total_items': 0, 'completed_items': 0,
+            'successful_items': 0, 'failed_items': 0, 'source_counts': {}, 'recent_errors': [],
+-           'message': 'آماده', 'started_at': None, 'finished_at': None, 'last_error': None}
++           'message': 'آماده', 'started_at': None, 'finished_at': None, 'last_error': None,
++           'heartbeat_ts': None, 'worker_started_ts': None, 'worker_finished_ts': None}
+ 
+ 
+ def _connect():
+@@ -469,6 +472,7 @@
+ 
+ 
+ def start_backfill(symbols, timeframes, start='2017-01-01T00:00:00+00:00'):
++    global _WORKER
+     """Start a resilient archive job and report per-symbol outcomes accurately."""
+     try:
+         symbols = expand_market_symbols(symbols)
+@@ -492,11 +496,14 @@
+             downloaded=0, total_requests=0, total_items=len(symbols) * len(timeframes),
+             completed_items=0, successful_items=0, failed_items=0, source_counts={}, recent_errors=[],
+             message='شروع دریافت تاریخچه', started_at=datetime.now().isoformat(),
+-            finished_at=None, last_error=None)
++            finished_at=None, last_error=None, heartbeat_ts=time.time(),
++            worker_started_ts=time.time(), worker_finished_ts=None)
+ 
+     def status_update(**values):
+         with _LOCK:
+             _STATUS.update(values)
++            if _STATUS.get('running'):
++                _STATUS['heartbeat_ts'] = time.time()
+ 
+     def worker():
+         successful_hourly = False
+@@ -510,7 +517,7 @@
+ 
+                     def cb(s, t, n, added, pages, cursor):
+                         with _LOCK:
+-                            _STATUS.update(downloaded=_STATUS['downloaded'] + int(n),
++                            _STATUS.update(heartbeat_ts=time.time(), downloaded=_STATUS['downloaded'] + int(n),
+                                 total_requests=_STATUS['total_requests'] + int(pages),
+                                 message=f'{s} {t}: صفحه {pages}، مجموع جدید {added:,} کندل')
+ 
+@@ -562,7 +569,8 @@
+                 except Exception as exc:
+                     status_update(brain_rescan_error=str(exc)[:180])
+ 
+-    threading.Thread(target=worker, daemon=True, name='history-backfill').start()
++    _WORKER = threading.Thread(target=worker, daemon=True, name='history-backfill')
++    _WORKER.start()
+     return True
+ 
+ 
+@@ -575,6 +583,12 @@
+         payload = dict(_STATUS)
+         payload['source_counts'] = dict(_STATUS.get('source_counts') or {})
+         payload['recent_errors'] = list(_STATUS.get('recent_errors') or [])
++        worker_alive = bool(_WORKER and _WORKER.is_alive())
++        heartbeat = payload.get('heartbeat_ts')
++        age = max(0.0, time.time() - float(heartbeat)) if heartbeat else None
++        payload.update(worker_alive=worker_alive, heartbeat_age_seconds=round(age, 1) if age is not None else None,
++            heartbeat_stale=bool(worker_alive and age is not None and age > _HEARTBEAT_STALE_SECONDS),
++            processor_state=('stale' if worker_alive and age is not None and age > _HEARTBEAT_STALE_SECONDS else 'active') if worker_alive else ('stopped' if payload.get('worker_finished_ts') else 'not_started'))
+     payload.update(db_path=str(DB_PATH), total_candles=count_candles())
+     return payload
+ 
+--- a/backend/scout.py
++++ b/backend/scout.py
+@@ -47,7 +47,8 @@
+ _HEALTH: dict[str, dict] = {}
+ _LOCK = threading.Lock()
+ _STATE: dict[str, Any] = {'result': None, 'running': False, 'last_start': 0.0, 'thread': None,
+-                          'stop': False, 'fail_streak': 0}
++                          'stop': False, 'fail_streak': 0, 'heartbeat_ts': None,
++                          'worker_started_ts': None, 'worker_finished_ts': None}
+ 
+ 
+ # ------------------------------------------------------------------ http
+@@ -1686,6 +1687,13 @@
+         out['running'] = bool(_STATE['running'])
+         out['fail_streak'] = _STATE['fail_streak']
+         out['interval_sec'] = interval()
++        worker = _STATE.get('thread')
++        alive = bool(worker and worker.is_alive())
++        heartbeat = _STATE.get('heartbeat_ts')
++        age = max(0.0, time.time() - float(heartbeat)) if heartbeat else None
++        out.update(worker_alive=alive, heartbeat_age_seconds=round(age, 1) if age is not None else None,
++            heartbeat_stale=bool(alive and age is not None and age > max(180, interval() * 2)),
++            processor_state=('stale' if alive and age is not None and age > max(180, interval() * 2) else ('scanning' if _STATE['running'] else 'active')) if alive else ('stopped' if _STATE.get('worker_finished_ts') else 'not_started'))
+         return out
+ 
+ 
+@@ -1702,6 +1710,7 @@
+         if _STATE['running']:
+             return get_state()
+         _STATE['running'] = True
++        _STATE['heartbeat_ts'] = time.time()
+     try:
+         res = scan_once()
+     except Exception as exc:
+@@ -1710,6 +1719,7 @@
+     finally:
+         with _LOCK:
+             _STATE['running'] = False
++            _STATE['heartbeat_ts'] = time.time()
+     with _LOCK:
+         prev = _STATE['result']
+         if res.get('online'):
+@@ -1730,7 +1740,9 @@
+ def _loop() -> None:
+     while not _STATE['stop']:
++        with _LOCK:
++            _STATE['heartbeat_ts'] = time.time()
+         run_scan()
+         # offline -> retry sooner (30s, 60s, ... capped at the normal interval) so it
+         # picks the internet up as soon as it returns
+@@ -1737,7 +1749,12 @@
+         for _ in range(int(wait)):
+             if _STATE['stop']:
++                with _LOCK:
++                    _STATE['worker_finished_ts'] = time.time()
++                    _STATE['heartbeat_ts'] = time.time()
+                 return
++            with _LOCK:
++                _STATE['heartbeat_ts'] = time.time()
+             time.sleep(1)
+ 
+ 
+@@ -1762,6 +1779,9 @@
+         if t and t.is_alive():
+             return False
+         _STATE['stop'] = False
++        _STATE['worker_started_ts'] = time.time()
++        _STATE['worker_finished_ts'] = None
++        _STATE['heartbeat_ts'] = time.time()
+         t = threading.Thread(target=_loop, name='storm-scout', daemon=True)
+         _STATE['thread'] = t
+     # The first live market scan begins in parallel with historical learning.
+--- /dev/null
++++ b/tests/test_v23_0_156_processor_heartbeat.py
+@@ -0,0 +1,76 @@
++"""Processor liveness is reported separately from stored/evidence freshness."""
++
++import time
++
++
++def test_market_brain_reports_worker_and_heartbeat_separately():
++    from backend import market_brain
++
++    old_worker = market_brain._STARTUP_WORKER
++    old_state = dict(market_brain._STARTUP_STATE)
++    try:
++        class Worker:
++            def is_alive(self):
++                return True
++
++        market_brain._STARTUP_WORKER = Worker()
++        market_brain._STARTUP_STATE.update(heartbeat_ts=time.time(), worker_finished_ts=None)
++        status = market_brain.historical_learning_status()
++        assert status['worker_alive'] is True
++        assert status['processor_state'] == 'active'
++        assert status['heartbeat_stale'] is False
++        market_brain._STARTUP_STATE['heartbeat_ts'] = time.time() - 700
++        status = market_brain.historical_learning_status()
++        assert status['processor_state'] == 'stale'
++        assert status['heartbeat_stale'] is True
++    finally:
++        market_brain._STARTUP_WORKER = old_worker
++        market_brain._STARTUP_STATE.clear()
++        market_brain._STARTUP_STATE.update(old_state)
++
++
++def test_backfill_status_reports_real_worker_liveness():
++    from backend import historical
++
++    old_worker = historical._WORKER
++    old_status = dict(historical._STATUS)
++    try:
++        class Worker:
++            def is_alive(self):
++                return True
++
++        historical._WORKER = Worker()
++        historical._STATUS.update(heartbeat_ts=time.time(), worker_finished_ts=None)
++        status = historical.backfill_status()
++        assert status['worker_alive'] is True
++        assert status['processor_state'] == 'active'
++        historical._STATUS['heartbeat_ts'] = time.time() - 700
++        status = historical.backfill_status()
++        assert status['processor_state'] == 'stale'
++    finally:
++        historical._WORKER = old_worker
++        historical._STATUS.clear()
++        historical._STATUS.update(old_status)
++
++
++def test_scout_reports_loop_liveness_without_claiming_scan_is_running():
++    from backend import scout
++
++    old_state = dict(scout._STATE)
++    try:
++        class Worker:
++            def is_alive(self):
++                return True
++
++        scout._STATE.update(thread=Worker(), running=False, heartbeat_ts=time.time(),
++                            worker_finished_ts=None)
++        status = scout.get_state()
++        assert status['worker_alive'] is True
++        assert status['processor_state'] == 'active'
++        assert status['running'] is False
++        scout._STATE['heartbeat_ts'] = time.time() - 700
++        status = scout.get_state()
++        assert status['processor_state'] == 'stale'
++    finally:
++        scout._STATE.clear()
++        scout._STATE.update(old_state)
