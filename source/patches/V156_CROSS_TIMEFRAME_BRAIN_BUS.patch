@@ -1,3 +1,17 @@
+diff --git a/backend/api.py b/backend/api.py
+index 1e065ce..e5ec515 100644
+--- a/backend/api.py
++++ b/backend/api.py
+@@ -2210,7 +2210,8 @@ def _run_analysis(symbol: str, timeframe: str, source: str,
+         result['shared_knowledge'] = {
+             'records': recall_knowledge(symbol, market='spot', timeframe=timeframe, limit=12,
+                                         exclude_sources='central_brain',
+-                                        max_age_seconds=7 * 24 * 3600),
++                                        max_age_seconds=7 * 24 * 3600,
++                                        include_other_timeframes=True),
+             'bus_status': knowledge_status(), 'advisory_only': True,
+         }
+     except Exception as knowledge_exc:
 diff --git a/backend/autopilot.py b/backend/autopilot.py
 index fdf6ace..57a630c 100644
 --- a/backend/autopilot.py
@@ -116,7 +130,7 @@ index d7b3d75..a19cd11 100644
          source_brain="historical_market_brain", knowledge_type="historical_analogs",
          direction="BULLISH", observed_at=1_800_000_090,
          payload={"analogs": 12},
-@@ -99,6 +99,10 @@ def test_price_action_brain_publishes_and_reads_shared_context(tmp_path, monkeyp
+@@ -99,6 +99,10 @@ def test_price_action_brain_publishes_and_reads_shared_context(tmp_path, monkeypatch
      packet = by_source["price_action_learning"]["payload"]
      assert by_source["price_action_learning"]["observed_at"] == 1_800_000_095
      assert packet["shared_context"]["sources"] == ["historical_market_brain"]
