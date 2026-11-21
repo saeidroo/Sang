@@ -18,6 +18,19 @@ class NisonCurriculumTests(unittest.TestCase):
         self.assertEqual(analyze_candles(rows,"unknown")["evidence"],[])
     def test_invalid_ohlc_rejected(self):
         with self.assertRaises(ValueError): analyze_candles([c(10,9,8,11)],"down")
+    def test_doji_is_neutral_advisory_evidence(self):
+        out=analyze_candles([c(10,12,8,10.02)],"down")
+        self.assertEqual(out["evidence"][0]["pattern"],"doji")
+        self.assertEqual(out["evidence"][0]["direction"],"neutral")
+        self.assertIsNone(out["trade_instruction"])
+        self.assertEqual(out["score_contribution"],0)
+        self.assertEqual(out["risk_contribution"],0)
+
+    def test_spinning_top_is_neutral(self):
+        out=analyze_candles([c(10,12,8,11)],"sideways")
+        self.assertEqual(out["evidence"][0]["pattern"],"spinning_top")
+        self.assertEqual(out["evidence"][0]["direction"],"neutral")
+
     def test_no_signal_or_risk_authority(self):
         out=analyze_candles([c(10,11,9,10)],"sideways")
         self.assertIsNone(out["trade_instruction"])
