@@ -1,39 +1,8 @@
---- a/backend/knowledge_bus.py
-+++ b/backend/knowledge_bus.py
-@@ -162,7 +162,8 @@
- 
- def recall_knowledge(symbol: str, *, market: str = "spot", timeframe: str | None = None,
-                      limit: int = 12, exclude_sources: str | list[str] | tuple[str, ...] | None = None,
--                     max_age_seconds: float | None = 7 * 24 * 3600) -> list[dict]:
-+                     max_age_seconds: float | None = 7 * 24 * 3600,
-+                     include_other_timeframes: bool = False) -> list[dict]:
-     """Read recent packets from other brains; no scores or weights are applied."""
-     sym = _token(symbol, upper=True)
-     if not sym:
-@@ -179,7 +180,7 @@
-     if market_key != "any":
-         clauses.append("market IN (?, 'any')")
-         args.append(market_key)
--    if timeframe:
-+    if timeframe and not include_other_timeframes:
-         clauses.append("timeframe IN (?, '')")
-         args.append(str(timeframe).strip().lower())
-     if max_age_seconds is not None:
---- a/backend/scout.py
-+++ b/backend/scout.py
-@@ -1391,7 +1391,8 @@
-             continue
-         try:
-             prior = recall_knowledge(symbol, market='spot', timeframe='1h', limit=8,
--                                     exclude_sources=own_sources, max_age_seconds=7 * 24 * 3600)
-+                                     exclude_sources=own_sources, max_age_seconds=7 * 24 * 3600,
-+                                     include_other_timeframes=True)
-             item['shared_knowledge'] = {
-                 'records': prior, 'count': len(prior), 'advisory_only': True,
-                 'note': 'شواهد مغزهای دیگر؛ در امتیاز یا رتبه Scout دخالت داده نشده است',
+diff --git a/backend/autopilot.py b/backend/autopilot.py
+index fdf6ace..57a630c 100644
 --- a/backend/autopilot.py
 +++ b/backend/autopilot.py
-@@ -1186,7 +1186,8 @@
+@@ -1186,7 +1186,8 @@ def _learning_policy_for_decision(base: str, market: str, decision: dict) -> dic
          scoped_symbol = _analysis_symbol(base, market)
          shared_records = recall_knowledge(
              scoped_symbol, market=market, timeframe=timeframe, limit=8,
@@ -43,9 +12,34 @@
          out['decision_context']['shared_knowledge'] = {
              'records': shared_records, 'count': len(shared_records),
              'advisory_only': True, 'affects_signal_or_risk': False,
+diff --git a/backend/knowledge_bus.py b/backend/knowledge_bus.py
+index 20897d0..d57c0ad 100644
+--- a/backend/knowledge_bus.py
++++ b/backend/knowledge_bus.py
+@@ -162,7 +162,8 @@ def publish_knowledge(*, symbol: str, source_brain: str, knowledge_type: str,
+ 
+ def recall_knowledge(symbol: str, *, market: str = "spot", timeframe: str | None = None,
+                      limit: int = 12, exclude_sources: str | list[str] | tuple[str, ...] | None = None,
+-                     max_age_seconds: float | None = 7 * 24 * 3600) -> list[dict]:
++                     max_age_seconds: float | None = 7 * 24 * 3600,
++                     include_other_timeframes: bool = False) -> list[dict]:
+     """Read recent packets from other brains; no scores or weights are applied."""
+     sym = _token(symbol, upper=True)
+     if not sym:
+@@ -179,7 +180,7 @@ def recall_knowledge(symbol: str, *, market: str = "spot", timeframe: str | None
+     if market_key != "any":
+         clauses.append("market IN (?, 'any')")
+         args.append(market_key)
+-    if timeframe:
++    if timeframe and not include_other_timeframes:
+         clauses.append("timeframe IN (?, '')")
+         args.append(str(timeframe).strip().lower())
+     if max_age_seconds is not None:
+diff --git a/backend/price_action_learning.py b/backend/price_action_learning.py
+index 6cef8f6..aa19df5 100644
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
-@@ -176,6 +176,13 @@
+@@ -176,6 +176,13 @@ def build_price_action_packet(*, candles: Any, analyses: dict | None = None,
          "shared_context": {
              "record_count": len(records),
              "sources": sorted({str(r.get("source_brain") or "")[:48] for r in records if r.get("source_brain")}),
@@ -59,7 +53,7 @@
              "structure_relation": relation,
              "aligned_directional_records": aligned,
              "conflicting_directional_records": conflicting,
-@@ -216,7 +223,8 @@
+@@ -216,7 +223,8 @@ def publish_price_action_evidence(*, symbol: str, market: str, timeframe: str,
  
      shared = recall_knowledge(symbol, market=market, timeframe=timeframe, limit=8,
                                exclude_sources="price_action_learning",
@@ -69,13 +63,28 @@
      packet = build_price_action_packet(candles=candles, analyses=analyses,
                                         shared_records=shared)
      trend = packet.get("trend", "NEUTRAL")
+diff --git a/backend/scout.py b/backend/scout.py
+index c81acd8..ea28275 100644
+--- a/backend/scout.py
++++ b/backend/scout.py
+@@ -1391,7 +1391,8 @@ def _share_brain_knowledge(items: list[dict], observed_at: float) -> dict:
+             continue
+         try:
+             prior = recall_knowledge(symbol, market='spot', timeframe='1h', limit=8,
+-                                     exclude_sources=own_sources, max_age_seconds=7 * 24 * 3600)
++                                     exclude_sources=own_sources, max_age_seconds=7 * 24 * 3600,
++                                     include_other_timeframes=True)
+             item['shared_knowledge'] = {
+                 'records': prior, 'count': len(prior), 'advisory_only': True,
+                 'note': 'شواهد مغزهای دیگر؛ در امتیاز یا رتبه Scout دخالت داده نشده است',
+diff --git a/tests/test_v23_0_154_brain_knowledge_bus.py b/tests/test_v23_0_154_brain_knowledge_bus.py
+index bd40034..daea575 100644
 --- a/tests/test_v23_0_154_brain_knowledge_bus.py
 +++ b/tests/test_v23_0_154_brain_knowledge_bus.py
-@@ -141,3 +141,22 @@
+@@ -141,3 +141,21 @@ def test_autopilot_attaches_shared_knowledge_but_does_not_change_decision_or_ris
      assert any(row['source_brain'] == 'autopilot' for row in
                 knowledge_bus.recall_knowledge('BTCUSDT', market='spot', timeframe='1h',
                                                max_age_seconds=None))
-+
 +
 +
 +def test_cross_timeframe_recall_is_opt_in_and_preserves_source_timeframe(tmp_path, monkeypatch):
@@ -94,9 +103,11 @@
 +        max_age_seconds=None)
 +    assert {row['timeframe'] for row in shared} == {'1h', '15m'}
 +    assert {row['payload']['origin'] for row in shared} == {'hourly', 'quarter_hour'}
+diff --git a/tests/test_v23_0_155_price_action_learning.py b/tests/test_v23_0_155_price_action_learning.py
+index d7b3d75..a19cd11 100644
 --- a/tests/test_v23_0_155_price_action_learning.py
 +++ b/tests/test_v23_0_155_price_action_learning.py
-@@ -76,7 +76,7 @@
+@@ -76,7 +76,7 @@ def test_price_action_brain_publishes_and_reads_shared_context(tmp_path, monkeyp
      monkeypatch.setattr(knowledge_bus, "_db_path", lambda: tmp_path / "knowledge.sqlite3")
      monkeypatch.setattr(knowledge_bus.time, "time", lambda: 1_800_000_100)
      knowledge_bus.publish_knowledge(
@@ -105,8 +116,9 @@
          source_brain="historical_market_brain", knowledge_type="historical_analogs",
          direction="BULLISH", observed_at=1_800_000_090,
          payload={"analogs": 12},
-@@ -99,6 +99,10 @@
+@@ -99,6 +99,10 @@ def test_price_action_brain_publishes_and_reads_shared_context(tmp_path, monkeyp
      packet = by_source["price_action_learning"]["payload"]
+     assert by_source["price_action_learning"]["observed_at"] == 1_800_000_095
      assert packet["shared_context"]["sources"] == ["historical_market_brain"]
 +    assert packet["shared_context"]["evidence"] == [{
 +        "source_brain": "historical_market_brain", "timeframe": "15m",
