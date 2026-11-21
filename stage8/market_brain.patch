@@ -1,0 +1,334 @@
+--- a/backend/market_brain.py
++++ b/backend/market_brain.py
+@@ -9,6 +9,7 @@
+ import sqlite3
+ import time
+ import json
++import math
+ from collections import defaultdict
+ from pathlib import Path
+ 
+@@ -18,13 +19,13 @@
+ )).expanduser()
+ MIN_ANALOGS = 8
+ MAX_CANDLES = 250_000
+-HISTORY_SCAN_VERSION = '6'
++HISTORY_SCAN_VERSION = '7'
+ HOURLY_TIMEFRAME_ALIASES = ('1h', '60m', '1hour', '1hr')
+ FEEDBACK_DB_PATH = Path(os.getenv('TRADING_AI_BRAIN_FEEDBACK_DB', str(HISTORY_DB_PATH.with_name('market_brain_feedback.sqlite3')))).expanduser()
+ FEEDBACK_HORIZONS = {'1h': 3600, '4h': 14400, '24h': 86400}
+ DIRECTIONAL_SIGNAL_HORIZONS = {'1h': 3600, '4h': 14400, '24h': 86400, '3d': 259200, '7d': 604800}
+ HISTORY_EXTREME_PCT = 10.0
+-_STARTUP_STATE = {'status': 'not_started', 'started_ts': None, 'finished_ts': None, 'symbols': 0, 'candles': 0, 'pump_events': 0, 'dump_events': 0, 'patterns': 0, 'cache_hit': False, 'error': None}
++_STARTUP_STATE = {'status': 'not_started', 'started_ts': None, 'finished_ts': None, 'symbols': 0, 'candles': 0, 'pump_events': 0, 'dump_events': 0, 'patterns': 0, 'invalid_rows': 0, 'duplicate_timestamp_groups': 0, 'gap_breaks': 0, 'segments': 0, 'cache_hit': False, 'error': None}
+ _STARTUP_LOCK = __import__('threading').Lock()
+ 
+ 
+@@ -47,6 +48,69 @@
+ 
+     wal = Path(str(archive) + '-wal')
+     return f'{HISTORY_SCAN_VERSION}:{archive}:{stamp(archive)}:wal={stamp(wal)}'
++
++
++def _prepare_hourly_segments(rows):
++    """Validate hourly OHLCV rows, deduplicate timestamps and split at gaps.
++
++    Input rows use the archive layout (symbol, t_ms, open, high, low, close,
++    volume). No labels are allowed to look across a missing or malformed hour.
++    Conflicting duplicate timestamps are discarded as a group; exact duplicates
++    are safely collapsed to one candle.
++    """
++    valid = []
++    invalid_rows = 0
++    by_timestamp = defaultdict(list)
++    for row in rows:
++        try:
++            raw_t = float(row[1])
++            values = [float(row[i]) for i in range(2, 7)]
++            if (not raw_t.is_integer() or raw_t <= 0
++                    or any(not math.isfinite(v) for v in values)):
++                raise ValueError('invalid timestamp or non-finite OHLCV')
++            ts = int(raw_t)
++            op, high, low, close, volume = values
++            if (min(op, high, low, close) <= 0 or volume < 0
++                    or high < max(op, close, low) or low > min(op, close, high)):
++                raise ValueError('invalid OHLCV bounds')
++            normalized = (row[0], ts, op, high, low, close, volume)
++            by_timestamp[ts].append(normalized)
++        except (TypeError, ValueError, IndexError, OverflowError):
++            invalid_rows += 1
++
++    duplicate_groups = 0
++    for ts, candidates in by_timestamp.items():
++        if len(candidates) > 1:
++            # Identical duplicate rows carry no additional information.
++            first = candidates[0]
++            if all(tuple(c[2:]) == tuple(first[2:]) for c in candidates[1:]):
++                duplicate_groups += 1
++                valid.append(first)
++            else:
++                duplicate_groups += 1
++                invalid_rows += len(candidates)
++            continue
++        valid.append(candidates[0])
++
++    valid.sort(key=lambda r: int(r[1]))
++    segments = []
++    current = []
++    gap_breaks = 0
++    for row in valid:
++        if current and int(row[1]) - int(current[-1][1]) != 3_600_000:
++            segments.append(current)
++            current = []
++            gap_breaks += 1
++        current.append(row)
++    if current:
++        segments.append(current)
++    return segments, {
++        'invalid_rows': invalid_rows,
++        'duplicate_timestamp_groups': duplicate_groups,
++        'gap_breaks': gap_breaks,
++        'segments': len(segments),
++        'valid_candles': sum(len(segment) for segment in segments),
++    }
+ 
+ 
+ def _bucket_signature(rows, index):
+@@ -163,7 +227,8 @@
+     with _STARTUP_LOCK:
+         _STARTUP_STATE.update(status='running', started_ts=now, finished_ts=None,
+                               symbols=0, candles=0, pump_events=0, dump_events=0,
+-                              patterns=0, error=None)
++                              patterns=0, invalid_rows=0, duplicate_timestamp_groups=0,
++                              gap_breaks=0, segments=0, error=None)
+     if not HISTORY_DB_PATH.exists():
+         with _STARTUP_LOCK:
+             _STARTUP_STATE.update(status='no_history_archive', finished_ts=time.time())
+@@ -187,16 +252,25 @@
+                 totals = cache.execute('SELECT COALESCE(SUM(pump_count),0), COALESCE(SUM(dump_count),0) FROM brain_historical_patterns').fetchone()
+                 symbol_count, candle_count = int(cached_symbols[0]), int(cached_candles[0])
+                 cached_status = 'completed_cached' if symbol_count > 0 and candle_count > 0 else 'no_symbols'
++                def cached_int(key):
++                    row = cache.execute('SELECT value FROM brain_history_cache_meta WHERE key=?', (key,)).fetchone()
++                    try:
++                        return max(0, int(row[0])) if row else 0
++                    except (TypeError, ValueError):
++                        return 0
+                 with _STARTUP_LOCK:
+                     _STARTUP_STATE.update(status=cached_status, finished_ts=time.time(),
+                         symbols=symbol_count, candles=candle_count,
+                         pump_events=int(totals[0]), dump_events=int(totals[1]),
+-                        patterns=int(cached), cache_hit=True,
++                        patterns=int(cached), invalid_rows=cached_int('invalid_rows'),
++                        duplicate_timestamp_groups=cached_int('duplicate_timestamp_groups'),
++                        gap_breaks=cached_int('gap_breaks'), segments=cached_int('segments'),
++                        cache_hit=True,
+                         error=None if symbol_count else 'آرشیو موجود است اما هیچ نماد/کندل معتبر ۱ساعته در آن پیدا نشد')
+                     return dict(_STARTUP_STATE)
+         finally:
+             cache.close()
+-        con = sqlite3.connect(str(HISTORY_DB_PATH), timeout=5)
++        con = sqlite3.connect(HISTORY_DB_PATH.resolve().as_uri() + '?mode=ro', uri=True, timeout=5)
+         try:
+             table = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='candles'").fetchone()
+             if not table:
+@@ -215,53 +289,54 @@
+             ).fetchall()
+         finally:
+             con.close()
+-        grouped = defaultdict(list)
++        raw_grouped = defaultdict(list)
+         for row in rows:
+-            try:
+-                if float(row[5]) > 0 and float(row[6]) >= 0:
+-                    grouped[str(row[0]).upper()].append(row)
+-            except (TypeError, ValueError, OverflowError):
+-                continue
++            raw_grouped[str(row[0]).upper()].append(row)
++        grouped = {}
++        quality = {'invalid_rows': 0, 'duplicate_timestamp_groups': 0,
++                   'gap_breaks': 0, 'segments': 0, 'valid_candles': 0}
++        for symbol, symbol_rows in raw_grouped.items():
++            segments, audit = _prepare_hourly_segments(symbol_rows)
++            for key in ('invalid_rows', 'duplicate_timestamp_groups', 'gap_breaks', 'segments', 'valid_candles'):
++                quality[key] += audit[key]
++            if segments:
++                grouped[symbol] = segments
+         if not grouped:
+             with _STARTUP_LOCK:
+                 _STARTUP_STATE.update(status='no_symbols', finished_ts=time.time(),
+                     symbols=0, candles=0, pump_events=0, dump_events=0,
+-                    patterns=0, cache_hit=False,
++                    patterns=0, invalid_rows=quality['invalid_rows'],
++                    duplicate_timestamp_groups=quality['duplicate_timestamp_groups'],
++                    gap_breaks=quality['gap_breaks'], segments=quality['segments'],
++                    cache_hit=False,
+                     error='آرشیو پیدا شد اما هیچ نماد دارای کندل معتبر ۱ساعته در آن وجود ندارد')
+                 return dict(_STARTUP_STATE)
+         pattern_counts = defaultdict(lambda: {'pump': 0, 'dump': 0})
+-        pumps = dumps = candles = 0
+-        for symbol, data in grouped.items():
+-            candles += len(data)
+-            data.sort(key=lambda r: int(r[1]))
+-            # Each label looks forward across 24 bars. Adjacent observations
+-            # therefore describe the same move repeatedly; count only the
+-            # first hit in a run of overlapping windows. Pump and dump have
+-            # independent episode boundaries, so a whipsaw can count as both.
+-            next_pump_window = next_dump_window = 0
+-            for i in range(24, len(data) - 24):
+-                start = float(data[i][5])
+-                pump_hit, dump_hit = _classify_extreme_window(start, data[i+1:i+25])
+-                count_pump = bool(pump_hit and i >= next_pump_window)
+-                count_dump = bool(dump_hit and i >= next_dump_window)
+-                if not (count_pump or count_dump):
+-                    continue
+-                # The current label consumes its complete forward window;
+-                # the next independent episode must begin after that window.
+-                if count_pump:
+-                    next_pump_window = i + 24
+-                if count_dump:
+-                    next_dump_window = i + 24
+-                # Store the state BEFORE the move, not after it. Both flags
+-                # may be true in a whipsaw window; preserve both outcomes.
+-                sig = _bucket_signature(data, i)
+-                if sig is not None:
++        pumps = dumps = 0
++        candles = quality['valid_candles']
++        for symbol, symbol_segments in grouped.items():
++            for data in symbol_segments:
++                # Never let a 24-bar label cross a missing or malformed hour.
++                next_pump_window = next_dump_window = 0
++                for i in range(24, len(data) - 24):
++                    start = float(data[i][5])
++                    pump_hit, dump_hit = _classify_extreme_window(start, data[i+1:i+25])
++                    count_pump = bool(pump_hit and i >= next_pump_window)
++                    count_dump = bool(dump_hit and i >= next_dump_window)
++                    if not (count_pump or count_dump):
++                        continue
+                     if count_pump:
+-                        pumps += 1
+-                        pattern_counts[sig]['pump'] += 1
++                        next_pump_window = i + 24
+                     if count_dump:
+-                        dumps += 1
+-                        pattern_counts[sig]['dump'] += 1
++                        next_dump_window = i + 24
++                    sig = _bucket_signature(data, i)
++                    if sig is not None:
++                        if count_pump:
++                            pumps += 1
++                            pattern_counts[sig]['pump'] += 1
++                        if count_dump:
++                            dumps += 1
++                            pattern_counts[sig]['dump'] += 1
+         cache = sqlite3.connect(str(FEEDBACK_DB_PATH), timeout=5)
+         try:
+             cache.execute('DELETE FROM brain_historical_patterns')
+@@ -271,13 +346,19 @@
+             cache.execute("INSERT OR REPLACE INTO brain_history_cache_meta(key,value) VALUES('archive_fingerprint',?)", (fingerprint,))
+             cache.execute("INSERT OR REPLACE INTO brain_history_cache_meta(key,value) VALUES('symbols',?)", (str(len(grouped)),))
+             cache.execute("INSERT OR REPLACE INTO brain_history_cache_meta(key,value) VALUES('candles',?)", (str(candles),))
++            for key in ('invalid_rows', 'duplicate_timestamp_groups', 'gap_breaks', 'segments'):
++                cache.execute("INSERT OR REPLACE INTO brain_history_cache_meta(key,value) VALUES(?,?)", (key, str(quality[key])))
+             cache.commit()
+         finally:
+             cache.close()
+         with _STARTUP_LOCK:
+             _STARTUP_STATE.update(status='completed', finished_ts=time.time(),
+                 symbols=len(grouped), candles=candles, pump_events=pumps,
+-                dump_events=dumps, patterns=len(pattern_counts), cache_hit=False, error=None)
++                dump_events=dumps, patterns=len(pattern_counts),
++                invalid_rows=quality['invalid_rows'],
++                duplicate_timestamp_groups=quality['duplicate_timestamp_groups'],
++                gap_breaks=quality['gap_breaks'], segments=quality['segments'],
++                cache_hit=False, error=None)
+             return dict(_STARTUP_STATE)
+     except Exception as exc:
+         with _STARTUP_LOCK:
+@@ -497,36 +578,53 @@
+     if not HISTORY_DB_PATH.exists():
+         return {'status': 'no_history_archive', 'symbols_analyzed': 0, 'analogs_used': 0}
+     try:
+-        con = sqlite3.connect(str(HISTORY_DB_PATH), timeout=3)
+-        rows = con.execute('''SELECT symbol,t,open,high,low,close,volume
+-            FROM candles WHERE timeframe='1h' ORDER BY t DESC LIMIT ?''',
+-            (MAX_CANDLES,)).fetchall()
+-        con.close()
++        con = sqlite3.connect(HISTORY_DB_PATH.resolve().as_uri() + '?mode=ro', uri=True, timeout=3)
++        try:
++            rows = con.execute('''SELECT symbol,t,open,high,low,close,volume
++                FROM candles WHERE timeframe='1h' ORDER BY symbol,t DESC LIMIT ?''',
++                (MAX_CANDLES,)).fetchall()
++        finally:
++            con.close()
+     except (sqlite3.Error, OSError):
+         return {'status': 'history_unavailable', 'symbols_analyzed': 0, 'analogs_used': 0}
+ 
+-    grouped = defaultdict(list)
++    raw_grouped = defaultdict(list)
+     for row in rows:
+         # Ignore any candle that has not fully closed.
+-        if float(row[1]) / 1000.0 + 3600 <= now:
+-            grouped[str(row[0]).upper()].append(row)
+-    for symbol in grouped:
+-        grouped[symbol].sort(key=lambda r: int(r[1]))
+-
+-    # Build historical analogs once per scan, then reuse for all candidates.
++        try:
++            if float(row[1]) / 1000.0 + 3600 <= now:
++                raw_grouped[str(row[0]).upper()].append(row)
++        except (TypeError, ValueError, OverflowError):
++            continue
++    grouped = {}
++    all_segments = {}
++    archive_quality = {'invalid_rows': 0, 'duplicate_timestamp_groups': 0,
++                       'gap_breaks': 0, 'segments': 0, 'valid_candles': 0}
++    for symbol, symbol_rows in raw_grouped.items():
++        segments, audit = _prepare_hourly_segments(symbol_rows)
++        for key in archive_quality:
++            archive_quality[key] += audit[key]
++        if segments:
++            all_segments[symbol] = segments
++            # Current-state analysis and BTC lead/lag use only the latest
++            # contiguous segment; older segments remain available as history.
++            grouped[symbol] = segments[-1]
++
++    # Build historical analogs once per scan, but never cross a missing hour.
+     analogs = defaultdict(lambda: {'1h': [], '4h': [], '24h': []})
+     cross_asset_analogs = defaultdict(lambda: {'1h': [], '4h': [], '24h': []})
+-    for symbol, data in grouped.items():
+-        for i in range(24, len(data) - 24):
+-            sig = _bucket_signature(data, i)
+-            if sig is None:
+-                continue
+-            start = float(data[i][5])
+-            for horizon, offset in (('1h', 1), ('4h', 4), ('24h', 24)):
+-                ret = _outcome(start, float(data[i+offset][5]))
+-                if ret is not None:
+-                    analogs[sig][horizon].append(ret)
+-                    cross_asset_analogs[sig][horizon].append((symbol, ret))
++    for symbol, symbol_segments in all_segments.items():
++        for data in symbol_segments:
++            for i in range(24, len(data) - 24):
++                sig = _bucket_signature(data, i)
++                if sig is None:
++                    continue
++                start = float(data[i][5])
++                for horizon, offset in (('1h', 1), ('4h', 4), ('24h', 24)):
++                    ret = _outcome(start, float(data[i+offset][5]))
++                    if ret is not None:
++                        analogs[sig][horizon].append(ret)
++                        cross_asset_analogs[sig][horizon].append((symbol, ret))
+ 
+     used = 0
+     analyzed = 0
+@@ -593,7 +691,8 @@
+         }
+     return {'status': 'ok' if rows else 'empty_history_archive',
+             'symbols_analyzed': analyzed, 'analogs_used': used,
+-            'historical_symbols': len(grouped), 'method': 'hourly_pattern_analogs_v2_directional'}
++            'historical_symbols': len(grouped), 'method': 'hourly_pattern_analogs_v2_directional',
++            'archive_quality': archive_quality}
+ 
+ 
+ def record_feedback(items: list[dict], snapshots: dict | None = None, now: float | None = None) -> dict:
