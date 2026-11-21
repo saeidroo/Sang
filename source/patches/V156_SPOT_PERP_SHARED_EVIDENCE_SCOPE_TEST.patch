@@ -1,0 +1,25 @@
+--- a/tests/test_v23_0_154_brain_knowledge_bus.py
++++ b/tests/test_v23_0_154_brain_knowledge_bus.py
+@@ -141,3 +141,22 @@
+     assert any(row['source_brain'] == 'autopilot' for row in
+                knowledge_bus.recall_knowledge('BTCUSDT', market='spot', timeframe='1h',
+                                               max_age_seconds=None))
++
++
++def test_market_any_evidence_is_shared_across_spot_and_perp_without_cross_market_leakage(tmp_path, monkeypatch):
++    monkeypatch.setattr(knowledge_bus, '_db_path', lambda: tmp_path / 'knowledge.sqlite3')
++    _record(source='spot_only', market='spot', observed_at=1_800_000_010)
++    _record(source='perp_only', market='perp', observed_at=1_800_000_011)
++    _record(source='historical_validation', market='any', observed_at=1_800_000_012)
++
++    spot = knowledge_bus.recall_knowledge(
++        'BTCUSDT', market='spot', timeframe='1h', max_age_seconds=None)
++    perp = knowledge_bus.recall_knowledge(
++        'BTCUSDT', market='perp', timeframe='1h', max_age_seconds=None)
++    all_markets = knowledge_bus.recall_knowledge(
++        'BTCUSDT', market='any', timeframe='1h', max_age_seconds=None)
++
++    assert {row['source_brain'] for row in spot} == {'spot_only', 'historical_validation'}
++    assert {row['source_brain'] for row in perp} == {'perp_only', 'historical_validation'}
++    assert {row['source_brain'] for row in all_markets} == {
++        'spot_only', 'perp_only', 'historical_validation'}
