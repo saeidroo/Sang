@@ -1,0 +1,46 @@
+--- a/backend/price_action_learning.py
++++ b/backend/price_action_learning.py
+@@ -190,6 +190,49 @@
+         "study_basis": [
+-            "John J. Murphy: trend, support/resistance, chart patterns, volume",
+-            "Steve Nison: candlestick formations combined with broader technical context",
+-            "Adam Grimes: conditional and statistical validation of price patterns",
++            "John J. Murphy — Technical Analysis of the Financial Markets: trend, support/resistance, chart patterns, volume",
++            "Steve Nison — Japanese Candlestick Charting Techniques: candle formations interpreted in market context",
++            "Adam Grimes — The Art and Science of Technical Analysis: conditional and statistical validation of price patterns",
+         ],
++        "book_curriculum": {
++            "version": "PRICE_ACTION_BOOK_CURRICULUM_V1",
++            "mode": "SHARED_ADVISORY_KNOWLEDGE",
++            "lessons": [
++                {"source": "John J. Murphy", "principles": [
++                    "Establish the primary trend before interpreting local patterns.",
++                    "Treat support/resistance as zones; assess repeated reactions and breaks.",
++                    "Confirm breakouts with closed prices; volume measures participation, not intent.",
++                    "Use multiple timeframes to separate primary trend from countertrend noise.",
++                    "Interpret chart patterns by location, prior trend, confirmation and invalidation."]},
++                {"source": "Steve Nison", "principles": [
++                    "Read candle bodies and shadows as the open-close battle.",
++                    "Candles are contextual evidence, never standalone trade instructions.",
++                    "Seek confirmation from a completed next candle or structural reaction.",
++                    "Evaluate pattern location against trend and meaningful support/resistance.",
++                    "Never infer certainty or intent from a candle name alone."]},
++                {"source": "Adam Grimes", "principles": [
++                    "Define setup context, trigger, invalidation and outcome horizon.",
++                    "Test expectancy after realistic fees, slippage and execution constraints.",
++                    "Separate discovery from validation with chronological holdout and walk-forward tests.",
++                    "Track sample size, base rate, regime, volatility and outcome distribution.",
++                    "Abstain when evidence is sparse, contradictory or statistically unstable."]},
++            ],
++            "shared_decision_protocol": [
++                "Analyze independently with the receiving brain's existing model.",
++                "Before finalizing, inspect relevant evidence from other brains and this curriculum.",
++                "Record aligned, conflicting, missing evidence and uncertainty separately.",
++                "Resolve conflicts inside the receiving brain; do not double-count duplicate sources.",
++                "The receiving brain alone issues its final decision; consultation cannot override it."],
++            "validation_gate": {
++                "required": ["chronological_holdout", "walk_forward", "fees_and_slippage", "regime_breakdown"],
++                "until_passed": "EDUCATION_AND_SHADOW_EVIDENCE_ONLY",
++                "may_change_signal_score_risk": False}},
+         "predictions_generated": False,
+         "signal_or_risk_effect": False,
