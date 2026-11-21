@@ -40,7 +40,7 @@ index 20897d0..d57c0ad 100644
      """Read recent packets from other brains; no scores or weights are applied."""
      sym = _token(symbol, upper=True)
      if not sym:
-@@ -179,7 +180,7 @@ def recall_knowledge(symbol: str, *, market: str = "any", timeframe: str | None
+@@ -179,7 +180,7 @@ def recall_knowledge(symbol: str, *, market: str = "spot", timeframe: str | None
      if market_key != "any":
          clauses.append("market IN (?, 'any')")
          args.append(market_key)
