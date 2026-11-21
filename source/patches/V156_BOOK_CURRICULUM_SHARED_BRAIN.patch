@@ -1,0 +1,77 @@
+--- a/backend/price_action_learning.py
++++ b/backend/price_action_learning.py
+@@ -188,10 +188,58 @@
+             "PATTERNS_REQUIRE_OUT_OF_SAMPLE_VALIDATION",
+         ],
+         "study_basis": [
+-            "John J. Murphy: trend, support/resistance, chart patterns, volume",
+-            "Steve Nison: candlestick formations combined with broader technical context",
+-            "Adam Grimes: conditional and statistical validation of price patterns",
++            "John J. Murphy — Technical Analysis of the Financial Markets: trend, support/resistance, chart patterns, volume",
++            "Steve Nison — Japanese Candlestick Charting Techniques: candle formations interpreted in market context",
++            "Adam Grimes — The Art and Science of Technical Analysis: conditional and statistical validation of price patterns",
+         ],
++        "book_curriculum": {
++            "version": "PRICE_ACTION_BOOK_CURRICULUM_V1",
++            "mode": "SHARED_ADVISORY_KNOWLEDGE",
++            "lessons": [
++                {
++                    "source": "John J. Murphy",
++                    "principles": [
++                        "Determine the primary trend before interpreting a local pattern.",
++                        "Treat support and resistance as zones; evaluate repeated reactions and level breaks.",
++                        "Require a closed-price breakout and assess volume as participation confirmation, not proof.",
++                        "Use multiple timeframes to distinguish primary trend from countertrend noise.",
++                        "Interpret chart patterns by location, prior trend, confirmation, and invalidation."
++                    ],
++                },
++                {
++                    "source": "Steve Nison",
++                    "principles": [
++                        "Read candle bodies and shadows as a description of the open-close battle.",
++                        "A candle pattern is contextual evidence, never a standalone trade instruction.",
++                        "Require the next completed candle or a structural/level reaction for confirmation.",
++                        "Evaluate pattern location near meaningful support/resistance and within the prevailing trend.",
++                        "Do not infer certainty or intent from a candle name alone."
++                    ],
++                },
++                {
++                    "source": "Adam Grimes",
++                    "principles": [
++                        "Define each setup with explicit context, trigger, invalidation, and outcome horizon.",
++                        "Test conditional expectancy after realistic fees, slippage, and execution constraints.",
++                        "Separate discovery from validation; use chronological out-of-sample and walk-forward tests.",
++                        "Track sample size, base rate, regime, volatility, and distribution of outcomes.",
++                        "Reject or abstain when evidence is sparse, contradictory, or statistically unstable."
++                    ],
++                },
++            ],
++            "shared_decision_protocol": [
++                "Analyze independently using the brain's existing model and responsibilities.",
++                "Before finalizing, inspect relevant evidence from other brains and this curriculum.",
++                "Record aligned evidence, conflicting evidence, missing evidence, and uncertainty separately.",
++                "Resolve the conflict within the receiving brain's own reasoning; do not count duplicate sources as independent evidence.",
++                "The receiving brain alone issues its final decision; consultation cannot override it.",
++            ],
++            "validation_gate": {
++                "required": ["chronological_holdout", "walk_forward", "fees_and_slippage", "regime_breakdown"],
++                "until_passed": "EDUCATION_AND_SHADOW_EVIDENCE_ONLY",
++                "may_change_signal_score_risk": False,
++            },
++        },
+@@ -0,0 +1,15 @@
++def test_book_curriculum_is_shared_as_advisory_training():
++    frame = pd.DataFrame([
++        {"open": 100, "high": 105, "low": 95, "close": 101},
++        {"open": 97, "high": 104, "low": 96, "close": 103},
++    ])
++    packet = build_price_action_packet(candles=frame)
++    curriculum = packet["book_curriculum"]
++    assert curriculum["version"] == "PRICE_ACTION_BOOK_CURRICULUM_V1"
++    assert {lesson["source"] for lesson in curriculum["lessons"]} == {
++        "John J. Murphy", "Steve Nison", "Adam Grimes"
++    }
++    assert len(curriculum["shared_decision_protocol"]) == 5
++    assert curriculum["validation_gate"]["may_change_signal_score_risk"] is False
++    assert packet["signal_or_risk_effect"] is False
++
