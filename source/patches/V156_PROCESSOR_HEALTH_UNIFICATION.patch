@@ -59,7 +59,7 @@
          else:
              for done, symbol_segments in enumerate(symbol_groups, 1):
 @@ -613,10 +619,10 @@
-                     pattern_counts[signature]['pump'] += values[1]
+                     pattern_counts[signature]['dump'] += values[1]
                  with _STARTUP_LOCK:
 -                    _STARTUP_STATE.update(symbols_done=done,
 +                    _STARTUP_STATE.update(symbols_done=done, heartbeat_ts=time.time(),
@@ -136,10 +136,12 @@
  
  
  def start_backfill(symbols, timeframes, start='2017-01-01T00:00:00+00:00'):
++    """Start a resilient archive job and report per-symbol outcomes accurately."""
 +    global _WORKER
-     """Start a resilient archive job and report per-symbol outcomes accurately."""
+-    """Start a resilient archive job and report per-symbol outcomes accurately."""
      try:
          symbols = expand_market_symbols(symbols)
+         timeframes = list(dict.fromkeys(str(tf).strip() for tf in timeframes))
 @@ -492,11 +496,14 @@
              downloaded=0, total_requests=0, total_items=len(symbols) * len(timeframes),
              completed_items=0, successful_items=0, failed_items=0, source_counts={}, recent_errors=[],
@@ -230,7 +232,7 @@
      with _LOCK:
          prev = _STATE['result']
          if res.get('online'):
-@@ -1730,7 +1740,9 @@
+@@ -1730,6 +1740,8 @@
  def _loop() -> None:
      while not _STATE['stop']:
 +        with _LOCK:
@@ -292,50 +294,5 @@
 +        market_brain._STARTUP_WORKER = old_worker
 +        market_brain._STARTUP_STATE.clear()
 +        market_brain._STARTUP_STATE.update(old_state)
-+
-+
-+def test_backfill_status_reports_real_worker_liveness():
-+    from backend import historical
-+
-+    old_worker = historical._WORKER
-+    old_status = dict(historical._STATUS)
-+    try:
-+        class Worker:
-+            def is_alive(self):
-+                return True
-+
-+        historical._WORKER = Worker()
-+        historical._STATUS.update(heartbeat_ts=time.time(), worker_finished_ts=None)
-+        status = historical.backfill_status()
-+        assert status['worker_alive'] is True
-+        assert status['processor_state'] == 'active'
-+        historical._STATUS['heartbeat_ts'] = time.time() - 700
-+        status = historical.backfill_status()
-+        assert status['processor_state'] == 'stale'
-+    finally:
-+        historical._WORKER = old_worker
-+        historical._STATUS.clear()
-+        historical._STATUS.update(old_status)
-+
-+
-+def test_scout_reports_loop_liveness_without_claiming_scan_is_running():
-+    from backend import scout
-+
-+    old_state = dict(scout._STATE)
-+    try:
-+        class Worker:
-+            def is_alive(self):
-+                return True
-+
-+        scout._STATE.update(thread=Worker(), running=False, heartbeat_ts=time.time(),
-+                            worker_finished_ts=None)
-+        status = scout.get_state()
-+        assert status['worker_alive'] is True
-+        assert status['processor_state'] == 'active'
-+        assert status['running'] is False
-+        scout._STATE['heartbeat_ts'] = time.time() - 700
-+        status = scout.get_state()
-+        assert status['processor_state'] == 'stale'
-+    finally:
-+        scout._STATE.clear()
-+        scout._STATE.update(old_state)
+
+
