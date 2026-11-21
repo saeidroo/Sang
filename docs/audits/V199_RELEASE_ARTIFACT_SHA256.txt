@@ -1,0 +1,6 @@
+Release: TradingSignalAIPro_V23.0.199_CROSS_BRAIN_CLOSED_PAPER_EXPERIENCE.zip
+SHA-256: a964a130da445259da07a835fbece14c00925c961f6877cb7dbc0ce8e01e6037
+Input: TradingSignalAIPro_V23.0.170_CLOSED_TRADE_PROVENANCE.zip
+Input SHA-256: db0f3a0e2efe1672a84cc503f11da1acbefd6aec75c2941663c46b5abbb6a2a9
+Validation: ZIP integrity passed; 92 targeted tests passed, 1 skipped.
+Note: the release ZIP is delivered as a conversation artifact; this repository commit records the audit/checksum, not the binary archive.
