@@ -1,0 +1,80 @@
+--- a/backend/price_action_learning.py
++++ b/backend/price_action_learning.py
+@@ -259,6 +259,12 @@
+     "is_forecast": False, "signal_or_risk_effect": False,
+     "real_orders_enabled": False,
+ }
++
++
++def _update_price_action_audit_state(values: dict) -> None:
++    """Serialize worker writes with status snapshots to prevent torn reads."""
++    with _PA_AUDIT_LOCK:
++        _PA_AUDIT_STATE.update(values)
+ 
+ 
+ def _archive_rows_clean(rows: Any) -> tuple[list[tuple], int]:
+@@ -715,7 +721,7 @@
+     import time
+     global _PA_AUDIT_STATE
+     try:
+-        _PA_AUDIT_STATE.update({"status": "running", "stage": "discovering_timeframes",
++        _update_price_action_audit_state({"status": "running", "stage": "discovering_timeframes",
+                                 "started_at": time.time(), "updated_at": time.time(),
+                                 "error": None, "progress_pct": 0,
+                                 "symbols_done": 0, "symbols_total": 0,
+@@ -727,25 +733,25 @@
+             results = []
+-            _PA_AUDIT_STATE.update({"timeframes_available": list(timeframes),
++            _update_price_action_audit_state({"timeframes_available": list(timeframes),
+                                     "timeframes_total": len(timeframes),
+                                     "stage": "scanning_archive"})
+             for tf_index, tf in enumerate(timeframes):
+-                _PA_AUDIT_STATE.update({"timeframe": tf, "timeframes_done": tf_index,
++                _update_price_action_audit_state({"timeframe": tf, "timeframes_done": tf_index,
+                                         "symbols_done": 0, "symbols_total": 0,
+                                         "progress_pct": int(tf_index * 100 / max(1, len(timeframes)))})
+ 
+                 def on_progress(values: dict, current_index=tf_index) -> None:
+                     local_pct = int(values.get("progress_pct", 0))
+                     overall_pct = int((current_index + local_pct / 100.0) * 100 / max(1, len(timeframes)))
+-                    _PA_AUDIT_STATE.update(dict(values, progress_pct=min(99, overall_pct)))
+-                    _PA_AUDIT_STATE["stage"] = "scanning_archive"
+-                    _PA_AUDIT_STATE["updated_at"] = time.time()
++                    _update_price_action_audit_state(dict(
++                        values, progress_pct=min(99, overall_pct),
++                        stage="scanning_archive", updated_at=time.time()))
+ 
+                 results.append(scan_price_action_archive(
+                     timeframe=tf, max_candles=100_000, publish=True,
+                     progress_callback=on_progress))
+-                _PA_AUDIT_STATE.update({"timeframes_done": tf_index + 1,
++                _update_price_action_audit_state({"timeframes_done": tf_index + 1,
+                                         "timeframe": tf,
+                                         "progress_pct": int((tf_index + 1) * 100 / max(1, len(timeframes))),
+                                         "updated_at": time.time()})
+@@ -788,7 +794,7 @@
+             x.get("average_directional_return_pct") if x.get("average_directional_return_pct") is not None else 999
+         ))[:8]
+-        _PA_AUDIT_STATE.update({
++        _update_price_action_audit_state({
+             "status": "completed" if aggregate["status"] == "completed" else "blocked",
+             "stage": "completed" if aggregate["status"] == "completed" else "blocked",
+             "progress_pct": 100 if aggregate["status"] == "completed" else int(_PA_AUDIT_STATE.get("progress_pct", 0)),
+@@ -810,7 +816,7 @@
+             "error": None if aggregate["status"] == "completed" else aggregate["status"],
+         })
+     except Exception as exc:
+-        _PA_AUDIT_STATE.update({"status": "error", "stage": "error",
++        _update_price_action_audit_state({"status": "error", "stage": "error",
+                                 "error": str(exc)[:240], "finished_at": time.time(),
+                                 "updated_at": time.time()})
+ 
+@@ -833,7 +839,7 @@
+             return price_action_archive_validation_status()
+         if _PA_AUDIT_STATE.get("status") in {"completed", "blocked"} and not force:
+             return price_action_archive_validation_status()
+-        _PA_AUDIT_STATE.update({"status": "starting", "stage": "starting",
++        _update_price_action_audit_state({"status": "starting", "stage": "starting",
+                                 "timeframe": timeframe, "progress_pct": 0,
+                                 "symbols_done": 0, "symbols_total": 0,
+                                 "error": None, "updated_at": __import__("time").time()})
