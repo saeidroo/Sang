@@ -1,15 +1,164 @@
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
-@@ -216,7 +216,8 @@
+@@ -256,10 +256,22 @@
+     "symbols_evaluated": 0, "patterns_evaluated": 0,
+     "directional_samples": 0, "pattern_groups_evaluated": 0,
+     "top_patterns": [], "weak_patterns": [],
+-    "updated_at": None, "error": None,
++    "updated_at": None, "heartbeat_at": None, "worker_started_at": None,
++    "worker_finished_at": None, "error": None,
+     "is_forecast": False, "signal_or_risk_effect": False,
+     "real_orders_enabled": False,
+ }
++_PA_HEARTBEAT_STALE_AFTER_SECONDS = 120.0
++
++
++def _pa_state_update(values: dict) -> None:
++    """Apply one atomic processor-state update and refresh its heartbeat."""
++    import time
++    with _PA_AUDIT_LOCK:
++        _PA_AUDIT_STATE.update(values)
++        _PA_AUDIT_STATE["updated_at"] = time.time()
++        if _PA_AUDIT_STATE.get("status") in {"starting", "running"}:
++            _PA_AUDIT_STATE["heartbeat_at"] = time.time()
  
-     shared = recall_knowledge(symbol, market=market, timeframe=timeframe, limit=8,
-                               exclude_sources="price_action_learning",
--                              max_age_seconds=7 * 24 * 3600)
-+                              max_age_seconds=7 * 24 * 3600,
-+                              include_other_timeframes=True)
-     packet = build_price_action_packet(candles=candles, analyses=analyses,
-                                        shared_records=shared)
-     trend = packet.get("trend", "NEUTRAL")
+ 
+ def _archive_rows_clean(rows: Any) -> tuple[list[tuple], int]:
+@@ -716,40 +728,38 @@
+     import time
+     global _PA_AUDIT_STATE
+     try:
+-        _PA_AUDIT_STATE.update({"status": "running", "stage": "discovering_timeframes",
+-                                "started_at": time.time(), "updated_at": time.time(),
+-                                "error": None, "progress_pct": 0,
+-                                "symbols_done": 0, "symbols_total": 0,
+-                                "timeframes_done": 0, "timeframes_total": 0,
+-                                "timeframes_available": []})
++        _pa_state_update({"status": "running", "stage": "discovering_timeframes",
++                          "worker_started_at": time.time(), "worker_finished_at": None,
++                          "error": None, "progress_pct": 0,
++                          "symbols_done": 0, "symbols_total": 0,
++                          "timeframes_done": 0, "timeframes_total": 0,
++                          "timeframes_available": []})
+         timeframes = _discover_price_action_timeframes() if timeframe == "auto" else [timeframe]
+         if not timeframes:
+             fallback = scan_price_action_archive(timeframe="1h", publish=False)
+             results = [fallback]
+         else:
+             results = []
+-            _PA_AUDIT_STATE.update({"timeframes_available": list(timeframes),
+-                                    "timeframes_total": len(timeframes),
+-                                    "stage": "scanning_archive"})
++            _pa_state_update({"timeframes_available": list(timeframes),
++                              "timeframes_total": len(timeframes),
++                              "stage": "scanning_archive"})
+             for tf_index, tf in enumerate(timeframes):
+-                _PA_AUDIT_STATE.update({"timeframe": tf, "timeframes_done": tf_index,
+-                                        "symbols_done": 0, "symbols_total": 0,
+-                                        "progress_pct": int(tf_index * 100 / max(1, len(timeframes)))})
++                _pa_state_update({"timeframe": tf, "timeframes_done": tf_index,
++                                  "symbols_done": 0, "symbols_total": 0,
++                                  "progress_pct": int(tf_index * 100 / max(1, len(timeframes)))})
+ 
+                 def on_progress(values: dict, current_index=tf_index) -> None:
+                     local_pct = int(values.get("progress_pct", 0))
+                     overall_pct = int((current_index + local_pct / 100.0) * 100 / max(1, len(timeframes)))
+-                    _PA_AUDIT_STATE.update(dict(values, progress_pct=min(99, overall_pct)))
+-                    _PA_AUDIT_STATE["stage"] = "scanning_archive"
+-                    _PA_AUDIT_STATE["updated_at"] = time.time()
++                    _pa_state_update(dict(values, progress_pct=min(99, overall_pct),
++                                          stage="scanning_archive"))
+ 
+                 results.append(scan_price_action_archive(
+                     timeframe=tf, max_candles=100_000, publish=True,
+                     progress_callback=on_progress))
+-                _PA_AUDIT_STATE.update({"timeframes_done": tf_index + 1,
+-                                        "timeframe": tf,
+-                                        "progress_pct": int((tf_index + 1) * 100 / max(1, len(timeframes))),
+-                                        "updated_at": time.time()})
++                _pa_state_update({"timeframes_done": tf_index + 1,
++                                  "timeframe": tf,
++                                  "progress_pct": int((tf_index + 1) * 100 / max(1, len(timeframes)))})
+ 
+         markets = [market for result in results for market in result.get("markets", [])]
+         completed_results = [result for result in results if result.get("status") == "completed"]
+@@ -789,7 +799,7 @@
+             x.get("average_directional_return_pct") is None,
+             x.get("average_directional_return_pct") if x.get("average_directional_return_pct") is not None else 999
+         ))[:8]
+-        _PA_AUDIT_STATE.update({
++        _pa_state_update({
+             "status": "completed" if aggregate["status"] == "completed" else "blocked",
+             "stage": "completed" if aggregate["status"] == "completed" else "blocked",
+             "progress_pct": 100 if aggregate["status"] == "completed" else int(_PA_AUDIT_STATE.get("progress_pct", 0)),
+@@ -802,7 +812,7 @@
+             "timeframes_available": list(timeframes),
+             "timeframes_done": len(timeframes), "timeframes_total": len(timeframes),
+             "top_patterns": top_patterns, "weak_patterns": weak_patterns,
+-            "finished_at": time.time(), "updated_at": time.time(),
++            "worker_finished_at": time.time(),
+             "archive_status": aggregate["status"],
+             "archive_path": aggregate["archive_path"],
+             "symbols_truncated": aggregate["symbols_truncated"],
+@@ -811,16 +821,39 @@
+             "error": None if aggregate["status"] == "completed" else aggregate["status"],
+         })
+     except Exception as exc:
+-        _PA_AUDIT_STATE.update({"status": "error", "stage": "error",
+-                                "error": str(exc)[:240], "finished_at": time.time(),
+-                                "updated_at": time.time()})
++        _pa_state_update({"status": "error", "stage": "error",
++                          "error": str(exc)[:240], "worker_finished_at": time.time()})
+ 
+ 
+ def price_action_archive_validation_status() -> dict:
+     """Return current validator liveness and counters without triggering work."""
+     from copy import deepcopy
++    import time
+     with _PA_AUDIT_LOCK:
+-        return deepcopy(_PA_AUDIT_STATE)
++        state = deepcopy(_PA_AUDIT_STATE)
++        thread = _PA_AUDIT_THREAD
++        alive = bool(thread is not None and thread.is_alive())
++    now = time.time()
++    heartbeat = _finite(state.get("heartbeat_at"))
++    age = max(0.0, now - heartbeat) if heartbeat is not None else None
++    running = state.get("status") in {"starting", "running"}
++    stale = bool(running and alive and age is not None
++                 and age > _PA_HEARTBEAT_STALE_AFTER_SECONDS)
++    if stale:
++        liveness = "stale"
++    elif running and alive:
++        liveness = "active"
++    elif running and not alive:
++        liveness = "worker_exited_unexpectedly"
++    elif state.get("status") in {"completed", "blocked", "error"}:
++        liveness = "finished"
++    else:
++        liveness = "idle"
++    state.update({"worker_alive": alive, "heartbeat_age_seconds": round(age, 2) if age is not None else None,
++                  "heartbeat_stale_after_seconds": _PA_HEARTBEAT_STALE_AFTER_SECONDS,
++                  "heartbeat_stale": stale, "liveness": liveness,
++                  "real_orders_enabled": False, "signal_or_risk_effect": False})
++    return state
+ 
+ 
+ def start_price_action_archive_validation(*, timeframe: str = "auto", force: bool = False) -> dict:
+@@ -834,10 +867,13 @@
+             return price_action_archive_validation_status()
+         if _PA_AUDIT_STATE.get("status") in {"completed", "blocked"} and not force:
+             return price_action_archive_validation_status()
++        now = __import__("time").time()
+         _PA_AUDIT_STATE.update({"status": "starting", "stage": "starting",
+                                 "timeframe": timeframe, "progress_pct": 0,
+                                 "symbols_done": 0, "symbols_total": 0,
+-                                "error": None, "updated_at": __import__("time").time()})
++                                "error": None, "updated_at": now,
++                                "heartbeat_at": now, "worker_started_at": now,
++                                "worker_finished_at": None})
+         _PA_AUDIT_THREAD = threading.Thread(
+             target=_price_action_archive_worker, args=(timeframe,),
+             name="price-action-history-validator", daemon=True)
 --- a/tests/test_v23_0_156_price_action_validation.py
 +++ b/tests/test_v23_0_156_price_action_validation.py
 @@ -144,3 +144,44 @@
