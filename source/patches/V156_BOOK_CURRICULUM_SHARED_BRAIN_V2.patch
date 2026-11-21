@@ -1,6 +1,6 @@
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
-@@ -190,7 +190,57 @@
+@@ -190,7 +190,49 @@
          "study_basis": [
 -            "John J. Murphy: trend, support/resistance, chart patterns, volume",
 -            "Steve Nison: candlestick formations combined with broader technical context",
@@ -38,7 +38,14 @@
 +                    "Build features from price momentum, reversal, volatility, liquidity, microstructure, market structure and cross-instrument context.",
 +                    "For multi-asset data, calculate rolling features per symbol; calculate peer ranks cross-sectionally at each timestamp.",
 +                    "Validate each feature for out-of-sample predictive information, stability across periods and redundancy with existing features.",
-+                    "Model-based features such as Kalman trend/uncertainty, GARCH volatility and HMM regime probabilities must be estimated only from information available at that timestamp and refit within walk-forward folds."]},
++                    "Design each feature with horizon alignment, a driver hypothesis and a clear role as signal or state variable.",
+                    "Choose reference frame, representation and aggregation deliberately; changing these can change the economic meaning of a feature.",
+                    "Test whether signal-by-state interactions add information beyond the signal and state separately; do not assume an interaction helps.",
+                    "Control feature search: vary one design choice at a time, deduplicate within families and account for multiple testing.",
+                    "Align slow fundamentals and macro data to their actual publication time and vintage; do not backfill revised values into earlier dates.",
+                    "Model-based features such as Kalman trend/uncertainty, GARCH volatility and HMM regime probabilities must be estimated only from information available at that timestamp and refit within walk-forward folds.",
+                    "Use filtered, point-in-time regime probabilities for historical decisions; smoothed probabilities that use future observations are not valid live features.",
+                    "Prefer regime probabilities as soft context or conditioning variables over brittle hard regime switches; preserve uncertainty when regimes overlap."]},
 +            ],
 +            "shared_decision_protocol": [
 +                "Analyze independently with the receiving brain's existing model.",
