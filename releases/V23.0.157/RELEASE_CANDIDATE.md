@@ -42,3 +42,12 @@ The repository currently has a V23.0.153 source-archive branch and a separate St
 Before importing the actual patch, restore/commit the exact V23.0.156 base (or prove compatibility by comparing the patch against that base), then apply only the listed changed files and run the focused regression suite.
 
 **Safety:** PAPER ONLY. No real orders. No strategy scores, weights, thresholds, ranking or risk limits changed by this recorded candidate.
+
+
+## Follow-up GitHub audit — 2026-11-21
+
+A further repository scan found the branch `fix/v153-market-feeds-and-brain-state` (3 commits ahead of `v23.0.153-rebuild`). It contains a separately documented V153 market-feed/historical-brain hotfix patchset under `source/patchset_v153_market_brain/`, including compressed patches for backend, frontend and focused tests. Its README reports 43 focused tests passed, while explicitly noting that the full suite and live provider connectivity were not verified.
+
+This hotfix is **not** the missing V154–V156 source history and is not evidence that the V157 patch applies cleanly to V153. The repository scan still found no verified V154, V155 or V156 branch/commit/PR snapshot. Keep the V157 candidate unapplied until the exact V156 base is recovered or compatibility is demonstrated with a clean patch check.
+
+The hotfix branch has not been merged, and the default branch has not been changed.
