@@ -16,7 +16,7 @@
 - `14_cost_sensitivity.py`: break-even cost و حساسیت بازده به فرض هزینه.
 - `15_lean_engine_parity.py` و `18_vectorbt_engine_parity.py`: مقایسه frameworkها و اعلام صریح محدودیت asset support.
 
-## 47 قاعده عملی افزوده‌شده
+## 48 قاعده عملی افزوده‌شده
 1. بک‌تست را تلاش برای رد استراتژی بدان، نه اثبات سودآوری.
 2. زمان سیگنال، دسترسی داده، universe، rebalance، sizing، order، fill، هزینه، محدودیت و benchmark را پیش از ارزیابی ثابت کن.
 3. vectorized را برای transitions از پیش معلوم و event-driven را برای state وابسته به cash، position، fill، P&L یا order pending انتخاب کن.
@@ -63,7 +63,8 @@
 44. آمار closed-trade را از mark-to-market جدا کن؛ open position در equity/exposure هست ولی در win rate معاملات بسته نیست.
 45. warm-up و missing dates را آشکار گزارش کن؛ تاریخ‌های نامطلوب را بی‌صدا حذف نکن.
 46. ارزش اقتصادی prediction را پس از position conversion، turnover، cost و constraints بسنج؛ IC به‌تنهایی کافی نیست.
-47. نتایج engine و هزینه بازار خارجی را روش‌شناسی بدان، نه مکانیک قابل انتقال؛ قواعد و داده بازار مقصد باید جداگانه اعتبارسنجی شوند. تا پایان shadow validation هیچ سفارش یا کنترل ریسک زنده‌ای فعال نشود.
+47. نتایج engine و هزینه بازار خارجی را روش‌شناسی بدان، نه مکانیک قابل انتقال؛ قواعد و داده بازار مقصد باید جداگانه اعتبارسنجی شوند.
+48. برابری دو engine فقط سازگاری پیاده‌سازی تحت پروتکل مشترک را نشان می‌دهد؛ صحت داده، شناسایی edge یا سودآوری آینده را اثبات نمی‌کند. تا پایان shadow validation هیچ سفارش یا کنترل ریسک زنده‌ای فعال نشود.
 
 ## نتیجه برای TradingAI
 - 47 اصل به همان curriculum موجود اضافه شد؛ شاخه یا مغز جدید ایجاد نشد.
