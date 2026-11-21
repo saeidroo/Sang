@@ -21,7 +21,7 @@ README فصل و پیاده‌سازی‌های Python زیر بررسی شدن�
 
 ## قواعد استخراج‌شده
 
-۵۲ قاعده عملی به همان curriculum مشترک اضافه شد. محورهای اصلی:
+۵۴ قاعده عملی به همان curriculum مشترک اضافه شد. محورهای اصلی:
 1. طبقه‌بندی هزینه‌های explicit، implicit، capacity و financing با حفظ واحد و lineage.
 2. تخمین و اعتبارسنجی spread و impact؛ جلوگیری از تبدیل نادرست حجم/واحد و leakage.
 3. مدل‌های linear، square-root و power-law و تحلیل ظرفیت با participation و ADV نقطه‌زمانی.
@@ -38,6 +38,6 @@ README فصل و پیاده‌سازی‌های Python زیر بررسی شدن�
 
 - Branch: `fix/v156-cross-timeframe-brain-bus`
 - Curriculum patch: `source/patches/V156_BOOK_CURRICULUM_SHARED_BRAIN_V2.patch`
-- Rule count: ۵۲
+- Rule count: ۵۴
 - Runtime behavior changed: خیر
 - Next curriculum chapter: Chapter 19 — Risk Management
