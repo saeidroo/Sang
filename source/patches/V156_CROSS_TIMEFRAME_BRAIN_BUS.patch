@@ -107,7 +107,7 @@
          payload={"analogs": 12},
 @@ -99,6 +99,10 @@
      packet = by_source["price_action_learning"]["payload"]
-     assert by_source["price_action_learning"]["shared_context"]["sources"] == ["historical_market_brain"]
+     assert packet["shared_context"]["sources"] == ["historical_market_brain"]
 +    assert packet["shared_context"]["evidence"] == [{
 +        "source_brain": "historical_market_brain", "timeframe": "15m",
 +        "knowledge_type": "historical_analogs", "direction": "BULLISH",
