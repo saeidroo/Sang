@@ -7,6 +7,9 @@
 -                     max_age_seconds: float | None = 7 * 24 * 3600) -> list[dict]:
 +                     max_age_seconds: float | None = 7 * 24 * 3600,
 +                     include_other_timeframes: bool = False) -> list[dict]:
+     """Read recent packets from other brains; no scores or weights are applied."""
+     sym = _token(symbol, upper=True)
+     if not sym:
 @@ -179,7 +180,7 @@
      if market_key != "any":
          clauses.append("market IN (?, 'any')")
