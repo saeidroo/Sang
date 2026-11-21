@@ -1,6 +1,6 @@
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
-@@ -190,7 +190,59 @@
+@@ -190,23 +190,64 @@
          "study_basis": [
 -            "John J. Murphy: trend, support/resistance, chart patterns, volume",
 -            "Steve Nison: candlestick formations combined with broader technical context",
