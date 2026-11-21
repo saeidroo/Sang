@@ -27,7 +27,7 @@ class NisonCurriculumTests(unittest.TestCase):
         self.assertEqual(out["risk_contribution"],0)
 
     def test_spinning_top_is_neutral(self):
-        out=analyze_candles([c(10,12,8,11)],"sideways")
+        out=analyze_candles([c(10,12,9,11)],"sideways")
         self.assertEqual(out["evidence"][0]["pattern"],"spinning_top")
         self.assertEqual(out["evidence"][0]["direction"],"neutral")
 
