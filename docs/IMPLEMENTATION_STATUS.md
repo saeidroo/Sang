@@ -6,7 +6,7 @@
 - مخزن: saeidroo/Sang
 - شاخهٔ اصلی: main (دست‌نخورده)
 - شاخهٔ کاری فعال: fix/v156-cross-timeframe-brain-bus
-- سورس اجرایی مبنا: V23.0.170؛ بسته‌های V199 تا V202 بر پایهٔ همان سورس واقعی و زنجیرهٔ بسته‌های تأییدشده ساخته شده‌اند.
+- سورس اجرایی مبنا: V23.0.170؛ بسته‌های V199 تا V203 بر پایهٔ همان سورس واقعی و زنجیرهٔ بسته‌های تأییدشده ساخته شده‌اند.
 - ZIPها و patchها artifact گفتگو هستند؛ GitHub گزارش‌ها و checksumها را نگه می‌دارد، نه باینری ZIP.
 
 ## نتیجهٔ V23.0.199
@@ -45,6 +45,18 @@
 - ZIP سالم با 1,085 فایل؛ PAPER ONLY؛ معاملهٔ زنده فعال نشده است.
 - گزارش: docs/audits/V202_BUILD_REPORT_FA.md
 
+
+## نتیجهٔ V23.0.203
+- منشأ پیش‌بینی‌های Historical Market Brain تا نتیجهٔ مشاهده‌شده قابل ردیابی شد.
+- brain_forecasts موجود producer، source_context_json و prediction_direction را نگه می‌دارد؛ رکوردهای قبلی با مقدار پیش‌فرض مهاجرت می‌کنند.
+- تابع فقط‌خواندنی forecast_provenance شناسه پیش‌بینی، افق، امضای الگو، رژیم، جهت، بازده مشاهده‌شده و outcome را کنار هم ارائه می‌کند.
+- Scout خروجی ممیزی را در market_brain_forecast_provenance برمی‌گرداند.
+- پوشش فقط برای Historical Market Brain اثبات شده؛ برای سایر مغزها هنوز ادعای provenance کامل نداریم.
+- تست متمرکز: 57 passed؛ py_compile و patch dry-run (18 فایل) موفق؛ ZIP سالم با 1,124 فایل.
+- full suite در این نسخه اجرا نشده است.
+- فقط ممیزی read-only؛ PAPER ONLY و بدون تغییر وزن/امتیاز/ریسک/اجرا.
+- گزارش: docs/audits/V203_BUILD_REPORT_FA.md
+
 ## ممیزی پوشش Knowledge Bus
 - ممیزی ایستای V199 پنج مسیر مصرف مستقیم را تأیید کرد؛ پوشش تمام ماژول‌های مغزی هنوز اثبات نشده است.
 - brain.py helper است و records را از caller می‌گیرد؛ مصرف‌کنندهٔ مستقل recall نیست.
@@ -63,9 +75,11 @@
 - docs/audits/V201_RELEASE_ARTIFACT_SHA256.txt
 - docs/audits/V202_BUILD_REPORT_FA.md
 - docs/audits/V202_RELEASE_ARTIFACT_SHA256.txt
+- docs/audits/V203_BUILD_REPORT_FA.md
+- docs/audits/V203_RELEASE_ARTIFACT_SHA256.txt
 
 ## موارد باز
-- اجرای V202 در محیط نصب‌شدهٔ کاربر و اجرای کامل suite با dependencies نصب‌شده (Flask در محیط ساخت حاضر نبود).
+- اجرای V203 در محیط نصب‌شدهٔ کاربر و اجرای کامل suite با dependencies نصب‌شده.
 - اثبات runtime در دادهٔ عملیاتی و بررسی دیتابیس‌های واقعی.
 - تکمیل پوشش مصرف‌کننده‌ها در مغزهای مستقل باقی‌مانده، پس از تعیین نقش واقعی هر ماژول.
 - تست یکپارچهٔ stale/duplicate و تفکیک خطای Bus از نبود شواهد در تمام consumerها.
