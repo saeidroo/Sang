@@ -92,13 +92,63 @@ index c81acd8..ea28275 100644
                  'records': prior, 'count': len(prior), 'advisory_only': True,
                  'note': 'شواهد مغزهای دیگر؛ در امتیاز یا رتبه Scout دخالت داده نشده است',
 diff --git a/tests/test_v23_0_154_brain_knowledge_bus.py b/tests/test_v23_0_154_brain_knowledge_bus.py
-index bd40034..daea575 100644
+index bd40034..69318be 100644
 --- a/tests/test_v23_0_154_brain_knowledge_bus.py
 +++ b/tests/test_v23_0_154_brain_knowledge_bus.py
-@@ -141,3 +141,21 @@ def test_autopilot_attaches_shared_knowledge_but_does_not_change_decision_or_ris
-     assert any(row['source_brain'] == 'autopilot' for row in
-                knowledge_bus.recall_knowledge('BTCUSDT', market='spot', timeframe='1h',
-                                               max_age_seconds=None))
+@@ -81,6 +81,10 @@ def test_scout_publishes_separate_brain_evidence_and_reads_other_brains(tmp_path
+     from backend import scout
+     monkeypatch.setattr(knowledge_bus, '_db_path', lambda: tmp_path / 'knowledge.sqlite3')
+     _record(source='central_brain', observed_at=1_800_000_001, payload={'brain': {'score': 0.42}})
++    knowledge_bus.publish_knowledge(
++        symbol='BTCUSDT', market='spot', timeframe='1h', source_brain='autopilot',
++        knowledge_type='paper_entry_candidate', direction='BUY', observed_at=1_800_000_002,
++        payload={'decision': {'kind': 'BUY'}})
+     items = [{
+         'symbol': 'BTCUSDT', 'direction': 'up', 'score': 81, 'phase': 'early',
+         'verified': True, 'price': 100.0,
+@@ -94,7 +98,9 @@ def test_scout_publishes_separate_brain_evidence_and_reads_other_brains(tmp_path
+     result = scout._share_brain_knowledge(items, observed_at=1_800_000_010)
+ 
+     assert result['published'] == 4
+-    assert items[0]['shared_knowledge']['count'] == 1
++    assert items[0]['shared_knowledge']['count'] == 2
++    assert {row['source_brain'] for row in items[0]['shared_knowledge']['records']} == {
++        'central_brain', 'autopilot'}
+     rows = knowledge_bus.recall_knowledge('BTCUSDT', market='spot', timeframe='1h',
+                                           max_age_seconds=None)
+     by_source = {row['source_brain']: row for row in rows}
+@@ -126,6 +132,8 @@ def test_autopilot_attaches_shared_knowledge_but_does_not_change_decision_or_ris
+         'paper_evidence_available': False, 'live_execution_allowed': False,
+     })
+     _record(source='scout_fusion', observed_at=1_800_000_001)
++    _record(source='central_brain', observed_at=1_800_000_002,
++            payload={'brain': {'decision': 'BUY', 'score': 0.7}})
+ 
+     decision = autopilot._learning_policy_for_decision('BTCUSDT', 'spot', {
+         'kind': 'BUY', 'brain': 'tech', 'confidence': 0.8,
+@@ -135,9 +143,35 @@ def test_autopilot_attaches_shared_knowledge_but_does_not_change_decision_or_ris
+     assert decision['kind'] == 'BUY'
+     assert decision['learning_gate']['risk_scale'] == 0.5
+     shared = decision['decision_context']['shared_knowledge']
+-    assert shared['count'] == 1
+-    assert shared['records'][0]['source_brain'] == 'scout_fusion'
++    assert shared['count'] == 2
++    assert {row['source_brain'] for row in shared['records']} == {
++        'scout_fusion', 'central_brain'}
+     assert shared['affects_signal_or_risk'] is False
+-    assert any(row['source_brain'] == 'autopilot' for row in
+-               knowledge_bus.recall_knowledge('BTCUSDT', market='spot', timeframe='1h',
+-                                              max_age_seconds=None))
++    published = knowledge_bus.recall_knowledge(
++        'BTCUSDT', market='spot', timeframe='1h', max_age_seconds=None)
++    assert any(row['source_brain'] == 'autopilot' for row in published)
++    # The central brain can retrieve Autopilot's next-cycle paper evidence.
++    central_next_cycle = knowledge_bus.recall_knowledge(
++        'BTCUSDT', market='spot', timeframe='1h', exclude_sources='central_brain',
++        max_age_seconds=None)
++    assert any(row['source_brain'] == 'autopilot' and
++               row['knowledge_type'] == 'paper_entry_candidate'
++               for row in central_next_cycle)
 +
 +
 +def test_cross_timeframe_recall_is_opt_in_and_preserves_source_timeframe(tmp_path, monkeypatch):
