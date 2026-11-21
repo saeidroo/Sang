@@ -1,6 +1,6 @@
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
-@@ -190,7 +190,40 @@
+@@ -190,7 +190,47 @@
          "study_basis": [
 -            "John J. Murphy: trend, support/resistance, chart patterns, volume",
 -            "Steve Nison: candlestick formations combined with broader technical context",
@@ -31,6 +31,14 @@
 +                    "Separate discovery from validation with chronological holdout and walk-forward tests.",
 +                    "Track sample size, base rate, regime, volatility and outcome distribution.",
 +                    "Abstain when evidence is sparse, contradictory or statistically unstable."]},
++                {"source": "Stefan Jansen — Machine Learning for Trading, Chapters 6-9", "principles": [
++                    "Begin with a falsifiable market hypothesis and plausible source of edge; an idea is not a trade signal.",
++                    "Define labels using returns that could actually be captured under the stated execution timing and horizon.",
++                    "Prevent feature-label endpoint overlap and every other form of look-ahead or target leakage.",
++                    "Build features from price momentum, reversal, volatility, liquidity, microstructure, market structure and cross-instrument context.",
++                    "For multi-asset data, calculate rolling features per symbol; calculate peer ranks cross-sectionally at each timestamp.",
++                    "Validate each feature for out-of-sample predictive information, stability across periods and redundancy with existing features.",
++                    "Model-based features such as Kalman trend/uncertainty, GARCH volatility and HMM regime probabilities must be estimated only from information available at that timestamp and refit within walk-forward folds."]},
 +            ],
 +            "shared_decision_protocol": [
 +                "Analyze independently with the receiving brain's existing model.",
