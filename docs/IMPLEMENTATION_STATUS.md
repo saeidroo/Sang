@@ -68,6 +68,16 @@
 - PAPER ONLY؛ معاملهٔ زنده فعال نشده است.
 - گزارش: docs/audits/V204_BUILD_REPORT_FA.md
 
+
+## نتیجهٔ V23.0.205
+- ثبت رسید مشورت در Knowledge Bus موجود برای Historical Market Brain، AutoPilot و Scout اضافه شد.
+- receiptها شناسهٔ packetهای بالغ‌شدهٔ دریافت‌شده و شمارندهٔ مراجعه را ثبت می‌کنند؛ summary مصرف را به تفکیک مغز نشان می‌دهد.
+- این معیار فقط مواجهه/خواندن را ثابت می‌کند، نه اثر علّی بر تصمیم یا افزایش دقت.
+- publisher و recall از نظر پرچم advisory سازگار شدند؛ تست اصلی 52 passed و مجموعهٔ تکمیلی 63 passed.
+- py_compile، patch dry-run و ZIP integrity موفق؛ full suite اجرا نشده است.
+- PAPER ONLY؛ بدون تغییر امتیاز، confidence، وزن مدل، ریسک یا اجرای سفارش.
+- گزارش: docs/audits/V205_BUILD_REPORT_FA.md
+
 ## ممیزی پوشش Knowledge Bus
 - ممیزی ایستای V199 پنج مسیر مصرف مستقیم را تأیید کرد؛ پوشش تمام ماژول‌های مغزی هنوز اثبات نشده است.
 - brain.py helper است و records را از caller می‌گیرد؛ مصرف‌کنندهٔ مستقل recall نیست.
@@ -90,6 +100,8 @@
 - docs/audits/V203_RELEASE_ARTIFACT_SHA256.txt
 - docs/audits/V204_BUILD_REPORT_FA.md
 - docs/audits/V204_RELEASE_ARTIFACT_SHA256.txt
+- docs/audits/V205_BUILD_REPORT_FA.md
+- docs/audits/V205_RELEASE_ARTIFACT_SHA256.txt
 
 ## موارد باز
 - اجرای V204 در محیط نصب‌شدهٔ کاربر و اجرای کامل suite با dependencies نصب‌شده.
