@@ -53,6 +53,8 @@
                                          "progress_pct": int((tf_index + 1) * 100 / max(1, len(timeframes))),
                                          "updated_at": time.time()})
 @@ -788,7 +794,7 @@
+         ranked.sort(key=lambda x: (
+             x.get("average_directional_return_pct") is None,
              x.get("average_directional_return_pct") if x.get("average_directional_return_pct") is not None else 999
          ))[:8]
 -        _PA_AUDIT_STATE.update({
@@ -68,7 +70,6 @@
 +        _update_price_action_audit_state({"status": "error", "stage": "error",
                                  "error": str(exc)[:240], "finished_at": time.time(),
                                  "updated_at": time.time()})
- 
 @@ -833,7 +839,7 @@
              return price_action_archive_validation_status()
          if _PA_AUDIT_STATE.get("status") in {"completed", "blocked"} and not force:
