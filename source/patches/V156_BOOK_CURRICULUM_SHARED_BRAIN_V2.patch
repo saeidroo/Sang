@@ -1,6 +1,6 @@
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
-@@ -190,7 +190,49 @@
+@@ -190,7 +190,59 @@
          "study_basis": [
 -            "John J. Murphy: trend, support/resistance, chart patterns, volume",
 -            "Steve Nison: candlestick formations combined with broader technical context",
@@ -45,7 +45,16 @@
                     "Align slow fundamentals and macro data to their actual publication time and vintage; do not backfill revised values into earlier dates.",
                     "Model-based features such as Kalman trend/uncertainty, GARCH volatility and HMM regime probabilities must be estimated only from information available at that timestamp and refit within walk-forward folds.",
                     "Use filtered, point-in-time regime probabilities for historical decisions; smoothed probabilities that use future observations are not valid live features.",
-                    "Prefer regime probabilities as soft context or conditioning variables over brittle hard regime switches; preserve uncertainty when regimes overlap."]},
+                    "Prefer regime probabilities as soft context or conditioning variables over brittle hard regime switches; preserve uncertainty when regimes overlap.",
+                    "Compute cross-sectional rank IC per timestamp when the hypothesis is cross-sectional; pooled correlations can mix time-series drift with cross-sectional predictability.",
+                    "Use HAC/Newey-West inference for serially dependent IC series and overlapping forward-return labels; ordinary independent-observation t-tests can overstate evidence.",
+                    "Apply multiple-testing correction across the full family of feature, horizon and parameter trials; report the number of attempted tests.",
+                    "Use bootstrap stability to check whether the direction of feature information persists across resamples; a high average alone is insufficient.",
+                    "Deduplicate highly correlated candidates and select representatives within feature families; correlation cutoffs are diagnostics, not universal constants.",
+                    "Choose a broad near-optimal parameter region over a single sharp optimum; performance that collapses under small reasonable changes is fragile.",
+                    "Keep feature selection, parameter sweeps and robustness decisions inside development folds; do not inspect the final holdout while selecting.",
+                    "Use timing placebos, shared-driver controls and regime-conditional analysis to challenge a proposed mechanism; these are falsification diagnostics, not proof of causality.",
+                    "Classify evidence as proceed, revise or stop; weak, unstable or mechanism-inconsistent features should not be promoted merely because one statistic is significant."]},
 +            ],
 +            "shared_decision_protocol": [
 +                "Analyze independently with the receiving brain's existing model.",
