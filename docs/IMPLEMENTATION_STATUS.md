@@ -6,7 +6,7 @@
 - مخزن: saeidroo/Sang
 - شاخهٔ اصلی: main (دست‌نخورده)
 - شاخهٔ کاری فعال: fix/v156-cross-timeframe-brain-bus
-- سورس اجرایی مبنا: V23.0.170؛ بسته‌های V199 تا V201 بر پایهٔ همان سورس واقعی و زنجیرهٔ بسته‌های تأییدشده ساخته شده‌اند.
+- سورس اجرایی مبنا: V23.0.170؛ بسته‌های V199 تا V202 بر پایهٔ همان سورس واقعی و زنجیرهٔ بسته‌های تأییدشده ساخته شده‌اند.
 - ZIPها و patchها artifact گفتگو هستند؛ GitHub گزارش‌ها و checksumها را نگه می‌دارد، نه باینری ZIP.
 
 ## نتیجهٔ V23.0.199
@@ -34,6 +34,17 @@
 - PAPER ONLY؛ معاملهٔ زنده فعال نشده است.
 - گزارش: docs/audits/V201_BUILD_REPORT_FA.md
 
+
+## نتیجهٔ V23.0.202
+- ممیزی حلقه نشان داد مسیر بستن دستی و Funding Sync انتشار داشتند، اما خروج خودکار در get_state و خروج ناشی از replay کندل انتشار Knowledge Bus را در همان مسیر تضمین نمی‌کردند.
+- get_state اکنون بسته‌شدن‌های تازه را تشخیص می‌دهد و پس از refresh پروفایل‌های محلی را به Knowledge Bus موجود منتشر می‌کند؛ وضعیت انتشار در learning_publication قابل مشاهده است.
+- replay_position_candles پس از commit تراکنش، پروفایل را منتشر می‌کند.
+- Perp تا Funding Sync موفق همچنان از learning event کنار گذاشته می‌شود.
+- تست هدفمند حلقه یادگیری/replay/مدیریت موقعیت/AutoPilot/Knowledge Bus/UI/version: 84 passed و 1 skipped؛ py_compile و patch dry-run موفق.
+- Full suite در collection برای 10 ماژول API به علت نبود Flask متوقف شد؛ full suite سبز نیست.
+- ZIP سالم با 1,085 فایل؛ PAPER ONLY؛ معاملهٔ زنده فعال نشده است.
+- گزارش: docs/audits/V202_BUILD_REPORT_FA.md
+
 ## ممیزی پوشش Knowledge Bus
 - ممیزی ایستای V199 پنج مسیر مصرف مستقیم را تأیید کرد؛ پوشش تمام ماژول‌های مغزی هنوز اثبات نشده است.
 - brain.py helper است و records را از caller می‌گیرد؛ مصرف‌کنندهٔ مستقل recall نیست.
@@ -50,9 +61,11 @@
 - docs/audits/V200_RELEASE_ARTIFACT_SHA256.txt
 - docs/audits/V201_BUILD_REPORT_FA.md
 - docs/audits/V201_RELEASE_ARTIFACT_SHA256.txt
+- docs/audits/V202_BUILD_REPORT_FA.md
+- docs/audits/V202_RELEASE_ARTIFACT_SHA256.txt
 
 ## موارد باز
-- اجرای V201 در محیط نصب‌شدهٔ کاربر و اجرای کامل suite با dependencies نصب‌شده.
+- اجرای V202 در محیط نصب‌شدهٔ کاربر و اجرای کامل suite با dependencies نصب‌شده (Flask در محیط ساخت حاضر نبود).
 - اثبات runtime در دادهٔ عملیاتی و بررسی دیتابیس‌های واقعی.
 - تکمیل پوشش مصرف‌کننده‌ها در مغزهای مستقل باقی‌مانده، پس از تعیین نقش واقعی هر ماژول.
 - تست یکپارچهٔ stale/duplicate و تفکیک خطای Bus از نبود شواهد در تمام consumerها.
