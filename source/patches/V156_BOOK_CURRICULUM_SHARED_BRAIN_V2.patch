@@ -459,7 +459,7 @@
 +                "Count risk thresholds, stop widths, overlays, stress scenarios, drift thresholds and kill-switch variants as model-selection trials; tune only within development data.",
 +                "Maintain a risk register linking each material risk to its metric, limit, owner, monitoring frequency, evidence, escalation path and last review.",
 +                "Require independent shadow validation, reproducible logs, point-in-time inputs and documented approval before any risk control can change position size or send orders."
-++            {"source": "Stefan Jansen — Machine Learning for Trading, Chapter 20: Strategy Synthesis", "principles": [
++            {"source": "Stefan Jansen — Machine Learning for Trading, Chapter 20: Strategy Synthesis", "principles": [
 +                "Treat strategy synthesis as a diagnostic comparison of complete signal-to-holdout pipelines, not a leaderboard of isolated Sharpe ratios or model families.",
 +                "Compare case studies only after pinning the same stage definitions, label, evaluation dates, portfolio convention, cost basis and holdout lineage; disclose any population mismatch.",
 +                "Separate the pipeline into data, features, labels, model, prediction, portfolio translation, execution costs, risk overlay and frozen holdout; record evidence at every transition.",
