@@ -1,6 +1,6 @@
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
-@@ -190,43 +190,84 @@
+@@ -190,48 +190,89 @@
          "study_basis": [
 -            "John J. Murphy: trend, support/resistance, chart patterns, volume",
 -            "Steve Nison: candlestick formations combined with broader technical context",
@@ -74,7 +74,12 @@
                     "Fit categorical vocabularies and encodings within training folds; define a safe unknown-category behavior for symbols, venues and instrument metadata first seen later.",
                     "Apply rolling imputations and normalizations per instrument where the economic meaning is instrument-specific; compute cross-sectional transforms only within the contemporaneous eligible universe.",
                     "Keep raw source values immutable and retain transformation lineage, timestamps, units and missingness reasons so downstream brains can trace each derived value.",
-                    "Avoid centered windows, global full-sample statistics and any preprocessing step that uses observations later than the simulated decision time."]},
+                    "Avoid centered windows, global full-sample statistics and any preprocessing step that uses observations later than the simulated decision time.",
+                    "Treat spike detectors that confirm a reversal with the next bar as retrospective data-quality diagnostics only; their future-dependent flag cannot be exposed as a live feature at the spike timestamp.",
+                    "Default to flagging unexpected time-series gaps before filling them; interpolation or forward fill can create synthetic tradable prices and must be justified, bounded and marked as imputed.",
+                    "Apply domain filters only when constraints are instrument- and venue-appropriate; log removed-row counts and retain an audit trail rather than silently discarding observations.",
+                    "Persist each fitted preprocessing state with its training-window identity and configuration; validation/test transforms must reuse that exact state and never refit on later data.",
+                    "For cross-frequency joins, align each observation to its actual availability/publication time; a daily close or revised fundamental is not available to an intraday decision made earlier."]},
 +            ],
 +            "shared_decision_protocol": [
 +                "Analyze independently with the receiving brain's existing model.",
