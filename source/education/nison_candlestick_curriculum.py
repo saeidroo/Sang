@@ -86,7 +86,7 @@ def analyze_candles(rows: Sequence[Dict[str,Any]], trend: str="unknown") -> Dict
         if x["body"] <= rng * 0.05:
             evidence.append(_result("doji", "neutral", i, i, bars, "Wait for the next completed candle and evaluate location/context.", x["low"], "Near-equal open and close; indecision, not a standalone reversal."))
             continue
-        if x["body"] <= rng * 0.35:
+        if x["body"] <= rng * 0.35 and x["lower"] < 2 * x["body"] and x["upper"] < 2 * x["body"]:
             evidence.append(_result("spinning_top", "neutral", i, i, bars, "Treat as a warning only; seek follow-through or structural confirmation.", x["low"], "Small real body; may indicate weakening directional control."))
         small=x["body"]<=rng*0.35
         tiny_up=x["upper"]<=max(x["body"]*0.25,rng*0.03)
