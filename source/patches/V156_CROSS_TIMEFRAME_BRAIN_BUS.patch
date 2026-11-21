@@ -7,9 +7,6 @@
 -                     max_age_seconds: float | None = 7 * 24 * 3600) -> list[dict]:
 +                     max_age_seconds: float | None = 7 * 24 * 3600,
 +                     include_other_timeframes: bool = False) -> list[dict]:
-     """Read recent packets from other brains; no scores or weights are applied."""
-     sym = _token(symbol, upper=True)
-     if not sym:
 @@ -179,7 +180,7 @@
      if market_key != "any":
          clauses.append("market IN (?, 'any')")
@@ -18,49 +15,33 @@
 +    if timeframe and not include_other_timeframes:
          clauses.append("timeframe IN (?, '')")
          args.append(str(timeframe).strip().lower())
-     if max_age_seconds is not None:
 --- a/backend/scout.py
 +++ b/backend/scout.py
 @@ -1391,7 +1391,8 @@
-             continue
          try:
              prior = recall_knowledge(symbol, market='spot', timeframe='1h', limit=8,
 -                                     exclude_sources=own_sources, max_age_seconds=7 * 24 * 3600)
 +                                     exclude_sources=own_sources, max_age_seconds=7 * 24 * 3600,
 +                                     include_other_timeframes=True)
-             item['shared_knowledge'] = {
-                 'records': prior, 'count': len(prior), 'advisory_only': True,
-                 'note': 'شواهد مغزهای دیگر؛ در امتیاز یا رتبه Scout دخالت داده نشده است',
 --- a/backend/autopilot.py
 +++ b/backend/autopilot.py
 @@ -1186,7 +1186,8 @@
-         scoped_symbol = _analysis_symbol(base, market)
          shared_records = recall_knowledge(
              scoped_symbol, market=market, timeframe=timeframe, limit=8,
 -            exclude_sources='autopilot', max_age_seconds=7 * 24 * 3600)
 +            exclude_sources='autopilot', max_age_seconds=7 * 24 * 3600,
 +            include_other_timeframes=True)
-         out['decision_context']['shared_knowledge'] = {
-             'records': shared_records, 'count': len(shared_records),
-             'advisory_only': True, 'affects_signal_or_risk': False,
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
 @@ -216,7 +216,8 @@
- 
      shared = recall_knowledge(symbol, market=market, timeframe=timeframe, limit=8,
                                exclude_sources="price_action_learning",
 -                              max_age_seconds=7 * 24 * 3600)
 +                              max_age_seconds=7 * 24 * 3600,
 +                              include_other_timeframes=True)
-     packet = build_price_action_packet(candles=candles, analyses=analyses,
-                                        shared_records=shared)
-     trend = packet.get("trend", "NEUTRAL")
 --- a/tests/test_v23_0_154_brain_knowledge_bus.py
 +++ b/tests/test_v23_0_154_brain_knowledge_bus.py
-@@ -142,3 +142,21 @@
-                knowledge_bus.recall_knowledge('BTCUSDT', market='spot', timeframe='1h',
-                                               max_age_seconds=None))
- 
+@@ -143,0 +144,18 @@
 +
 +def test_cross_timeframe_recall_is_opt_in_and_preserves_source_timeframe(tmp_path, monkeypatch):
 +    monkeypatch.setattr(knowledge_bus, '_db_path', lambda: tmp_path / 'knowledge.sqlite3')
@@ -69,7 +50,6 @@
 +    _record(source='price_action_learning', timeframe='15m', observed_at=1_800_000_002,
 +            payload={'origin': 'quarter_hour'})
 +
-+    # Existing callers retain strict timeframe isolation by default.
 +    strict = knowledge_bus.recall_knowledge(
 +        'BTCUSDT', market='spot', timeframe='15m', max_age_seconds=None)
 +    assert [row['timeframe'] for row in strict] == ['15m']
