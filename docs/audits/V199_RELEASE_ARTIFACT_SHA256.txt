@@ -1,7 +1,8 @@
 Release: TradingSignalAIPro_V23.0.199_CROSS_BRAIN_CLOSED_PAPER_EXPERIENCE.zip
-SHA-256: a79023f97b544e6ede8967b6b9e520b41d742b320415b915f89ea3466c773a3f
+SHA-256: 0d4b28a0c4a0ef2cf29d59dda6eb47f302c09471df3ae4ceaba753711e6bc090
 Input: TradingSignalAIPro_V23.0.170_CLOSED_TRADE_PROVENANCE.zip
 Input SHA-256: db0f3a0e2efe1672a84cc503f11da1acbefd6aec75c2941663c46b5abbb6a2a9
-Validation: ZIP integrity passed; 1,076 manifest entries verified with zero mismatches; 92 targeted tests passed, 1 skipped.
-Hotfix: Windows installer banner and version-contract test now use/check V23.0.199.
+Final verification: ZIP integrity passed; 1,125 manifest entries verified with zero mismatches; 95 targeted tests passed, 1 skipped; 9 changed Python files passed py_compile.
+Final QA correction: version-contract test now checks V23.0.199 in backend, launcher, README and install.bat; historical V23.0.152 changelog headings remain intentionally preserved.
+Patch: V170_TO_V199_CLOSED_PAPER_EXPERIENCE.patch; dry-run against V170 base passed.
 Note: release ZIP and patch are conversation artifacts; this repository commit records the audit/checksum, not the binary archive.
