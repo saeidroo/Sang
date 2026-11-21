@@ -45,7 +45,21 @@
              'advisory_only': True, 'affects_signal_or_risk': False,
 --- a/backend/price_action_learning.py
 +++ b/backend/price_action_learning.py
-@@ -216,7 +216,8 @@
+@@ -176,6 +176,13 @@
+         "shared_context": {
+             "record_count": len(records),
+             "sources": sorted({str(r.get("source_brain") or "")[:48] for r in records if r.get("source_brain")}),
++            "evidence": [
++                {"source_brain": str(r.get("source_brain") or "")[:48],
++                 "timeframe": str(r.get("timeframe") or "")[:12],
++                 "knowledge_type": str(r.get("knowledge_type") or "")[:48],
++                 "direction": str(r.get("direction") or "UNKNOWN")[:16]}
++                for r in records[:8]
++            ],
+             "structure_relation": relation,
+             "aligned_directional_records": aligned,
+             "conflicting_directional_records": conflicting,
+@@ -216,7 +223,8 @@
  
      shared = recall_knowledge(symbol, market=market, timeframe=timeframe, limit=8,
                                exclude_sources="price_action_learning",
@@ -57,10 +71,11 @@
      trend = packet.get("trend", "NEUTRAL")
 --- a/tests/test_v23_0_154_brain_knowledge_bus.py
 +++ b/tests/test_v23_0_154_brain_knowledge_bus.py
-@@ -141,3 +141,21 @@
+@@ -141,3 +141,22 @@
      assert any(row['source_brain'] == 'autopilot' for row in
                 knowledge_bus.recall_knowledge('BTCUSDT', market='spot', timeframe='1h',
                                                max_age_seconds=None))
++
 +
 +
 +def test_cross_timeframe_recall_is_opt_in_and_preserves_source_timeframe(tmp_path, monkeypatch):
@@ -79,3 +94,23 @@
 +        max_age_seconds=None)
 +    assert {row['timeframe'] for row in shared} == {'1h', '15m'}
 +    assert {row['payload']['origin'] for row in shared} == {'hourly', 'quarter_hour'}
+--- a/tests/test_v23_0_155_price_action_learning.py
++++ b/tests/test_v23_0_155_price_action_learning.py
+@@ -76,7 +76,7 @@
+     monkeypatch.setattr(knowledge_bus, "_db_path", lambda: tmp_path / "knowledge.sqlite3")
+     monkeypatch.setattr(knowledge_bus.time, "time", lambda: 1_800_000_100)
+     knowledge_bus.publish_knowledge(
+-        symbol="BTCUSDT", market="spot", timeframe="1h",
++        symbol="BTCUSDT", market="spot", timeframe="15m",
+         source_brain="historical_market_brain", knowledge_type="historical_analogs",
+         direction="BULLISH", observed_at=1_800_000_090,
+         payload={"analogs": 12},
+@@ -99,6 +99,10 @@
+     packet = by_source["price_action_learning"]["payload"]
+     assert by_source["price_action_learning"]["shared_context"]["sources"] == ["historical_market_brain"]
++    assert packet["shared_context"]["evidence"] == [{
++        "source_brain": "historical_market_brain", "timeframe": "15m",
++        "knowledge_type": "historical_analogs", "direction": "BULLISH",
++    }]
+     assert packet["signal_or_risk_effect"] is False
+     assert packet["data_policy"] == "CLOSED_CANDLES_ONLY"
