@@ -40,7 +40,7 @@ index 20897d0..d57c0ad 100644
      """Read recent packets from other brains; no scores or weights are applied."""
      sym = _token(symbol, upper=True)
      if not sym:
-@@ -179,7 +180,7 @@ def recall_knowledge(symbol: str, *, market: str = "spot", timeframe: str | None
+@@ -179,7 +180,7 @@ def recall_knowledge(symbol: str, *, market: str = "any", timeframe: str | None
      if market_key != "any":
          clauses.append("market IN (?, 'any')")
          args.append(market_key)
@@ -118,13 +118,30 @@ index bd40034..daea575 100644
 +    assert {row['timeframe'] for row in shared} == {'1h', '15m'}
 +    assert {row['payload']['origin'] for row in shared} == {'hourly', 'quarter_hour'}
 diff --git a/tests/test_v23_0_155_price_action_learning.py b/tests/test_v23_0_155_price_action_learning.py
-index d7b3d75..a19cd11 100644
+index d7b3d75..62e6602 100644
 --- a/tests/test_v23_0_155_price_action_learning.py
 +++ b/tests/test_v23_0_155_price_action_learning.py
-@@ -99,6 +99,10 @@ def test_price_action_brain_publishes_and_reads_shared_context(tmp_path, monkeypatch
+@@ -86,19 +86,25 @@ def test_price_action_brain_publishes_and_reads_shared_context(tmp_path, monkeyp
+         {"open": 97, "high": 104, "low": 96, "close": 103},
+     ])
+     result = publish_price_action_evidence(
+-        symbol="BTCUSDT", market="spot", timeframe="1h",
++        symbol="BTCUSDT", market="spot", timeframe="15m",
+         observed_at=1_800_000_095_000, candles=frame,
+         analyses={"advanced_structure": {"trend": "BULLISH", "state": "NO_BREAK", "events": []}},
+     )
+     assert result["stored"] is True
+     assert result["shared_context_count"] == 1
+     rows = knowledge_bus.recall_knowledge(
+-        "BTCUSDT", market="spot", timeframe="1h", max_age_seconds=None)
++        "BTCUSDT", market="spot", timeframe="15m", max_age_seconds=None)
+     by_source = {row["source_brain"]: row for row in rows}
+     assert "price_action_learning" in by_source
      packet = by_source["price_action_learning"]["payload"]
      assert by_source["price_action_learning"]["observed_at"] == 1_800_000_095
      assert packet["shared_context"]["sources"] == ["historical_market_brain"]
++    assert packet["shared_context"]["record_count"] == 1
++    assert packet["shared_context"]["structure_relation"] == "ALIGNED"
 +    assert packet["shared_context"]["evidence"] == [{
 +        "source_brain": "historical_market_brain", "timeframe": "1h",
 +        "knowledge_type": "historical_analogs", "direction": "BULLISH",
