@@ -1,0 +1,62 @@
+--- a/backend/price_action_learning.py
++++ b/backend/price_action_learning.py
+@@ -17,6 +17,7 @@
+
+ import math
+ import threading
++import time
+ from typing import Any
+
+ RULESET_VERSION = "price-action-education-v1"
+@@ -662,12 +663,15 @@
+                         "out_of_sample_metrics": item["walk_forward"].get("out_of_sample_metrics"),
+                     } for item in report["pattern_reports"][:18]
+                        if item.get("trend_context") == "ALL" and item.get("volume_band") == "ALL"]
++                    validated_at = time.time()
+                     publish_knowledge(
+                         symbol=str(symbol), market="any", timeframe=timeframe,
+                         source_brain="price_action_validation",
+                         knowledge_type="historical_pattern_performance",
+-                        direction="UNKNOWN", observed_at=(rows[-1][0] / 1000.0 if rows else None),
++                        direction="UNKNOWN", observed_at=validated_at,
+                         payload={"schema_version": "price-action-validation-v1",
++                                 "validated_at": validated_at,
++                                 "source_data_through": (rows[-1][0] / 1000.0 if rows else None),
+                                  "validation_method": report["validation_method"],
+                                  "pattern_reports": compact,
+                                  "future_data_used_for_past": False,
+--- a/tests/test_v23_0_156_price_action_validation.py
++++ b/tests/test_v23_0_156_price_action_validation.py
+@@ -98,6 +98,32 @@
+     assert shared["payload"]["signal_or_risk_effect"] is False
+
+
++def test_historical_validation_evidence_uses_validation_time_for_freshness(tmp_path, monkeypatch):
++    from backend import price_action_learning as learning
++    db = tmp_path / "old-candles.sqlite3"
++    con = sqlite3.connect(db)
++    con.execute("CREATE TABLE candles (symbol TEXT,timeframe TEXT,t INTEGER,open REAL,high REAL,low REAL,close REAL,volume REAL)")
++    con.executemany("INSERT INTO candles VALUES (?,?,?,?,?,?,?,?)",
++                    [("BTCUSDT", "1h", *row) for row in _rows_with_engulfings()])
++    con.commit()
++    con.close()
++
++    validated_at = 1_800_000_000.0
++    monkeypatch.setattr(learning.time, "time", lambda: validated_at)
++    monkeypatch.setattr(knowledge_bus, "_db_path", lambda: tmp_path / "knowledge.sqlite3")
++    result = learning.scan_price_action_archive(
++        timeframe="1h", db_path=db, min_samples=8, publish=True)
++    assert result["status"] == "completed"
++
++    recent = knowledge_bus.recall_knowledge(
++        "BTCUSDT", market="any", timeframe="15m", include_other_timeframes=True,
++        max_age_seconds=7 * 24 * 3600)
++    record = next(x for x in recent if x["source_brain"] == "price_action_validation")
++    assert record["observed_at"] == validated_at
++    assert record["payload"]["validated_at"] == validated_at
++    assert record["payload"]["source_data_through"] < validated_at - 7 * 24 * 3600
+
+
+ def test_missing_archive_is_explicit(tmp_path):
+     result = scan_price_action_archive(timeframe="1h", db_path=tmp_path / "missing.sqlite3")
+     assert result["status"] == "no_history_archive"
