@@ -20,3 +20,14 @@ Existing `source/education/nison_candlestick_curriculum.py` now exposes `INSPECT
 
 ## Boundaries
 This is a partial extraction of Chapter 3, not a claim that the full book has been OCR-processed. Other chapter mappings remain topic outlines until their actual pages are inspected. The analyzer remains shadow/advisory only; no live trading or autonomous order action is enabled.
+
+
+## V175 continuation — printed page 29
+The next scanned page (PDF page 40, printed page 29) was visually inspected. Additional original paraphrases were added to `INSPECTED_LESSONS[3]`:
+- The open is an early and provisional view of the market battle.
+- The close is a pivotal completed price and may be used to confirm a breakout beyond an important chart level.
+- Some technical systems, including moving-average systems, calculate from closing prices.
+- The author labels unusually large orders intended to affect the close a “night attack” and similar orders at the open a “morning attack”.
+- Pattern names act as memory aids for market emotion; the page characterizes dark-cloud cover and evening star as bearish, and morning star as bullish.
+
+The source uses the “attack” wording as terminology/metaphor; the code stores it as an educational note, not as a measurable detector. Two tests were added for neutral doji and spinning-top advisory output. Tests have been committed but not executed in this environment.
