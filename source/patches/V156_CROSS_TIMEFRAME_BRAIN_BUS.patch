@@ -198,3 +198,60 @@ index d7b3d75..62e6602 100644
 +    }]
      assert packet["signal_or_risk_effect"] is False
      assert packet["data_policy"] == "CLOSED_CANDLES_ONLY"
+diff --git a/backend/price_action_learning.py b/backend/price_action_learning.py
+--- a/backend/price_action_learning.py
++++ b/backend/price_action_learning.py
+@@ -146,5 +146,16 @@
+     records = [r for r in (shared_records or []) if isinstance(r, dict)]
+-    shared_directions = [str(r.get("direction") or "UNKNOWN").upper() for r in records]
+-    aligned = sum(1 for direction in shared_directions if trend in {"BULLISH", "BEARISH"} and direction == trend)
+-    conflicting = sum(1 for direction in shared_directions
+-                      if trend in {"BULLISH", "BEARISH"} and direction in {"BULLISH", "BEARISH"} and direction != trend)
++    # Give each independent brain at most one directional vote. Multiple
++    # knowledge types from the same brain must not outweigh other brains.
++    directions_by_source: dict[str, set[str]] = {}
++    for record in records:
++        source = str(record.get("source_brain") or "").strip()[:48]
++        direction = str(record.get("direction") or "UNKNOWN").upper()
++        if source and direction in {"BULLISH", "BEARISH"}:
++            directions_by_source.setdefault(source, set()).add(direction)
++    source_directions = [next(iter(values)) for values in directions_by_source.values()
++                         if len(values) == 1]
++    aligned = sum(1 for direction in source_directions
++                  if trend in {"BULLISH", "BEARISH"} and direction == trend)
++    conflicting = sum(1 for direction in source_directions
++                      if trend in {"BULLISH", "BEARISH"} and direction != trend)
+     relation = "NO_DIRECTIONAL_CONTEXT"
+     if trend in {"BULLISH", "BEARISH"}:
+         relation = "ALIGNED" if aligned > conflicting else "CONFLICTING" if conflicting > aligned else "MIXED_OR_EQUAL"
+diff --git a/tests/test_v23_0_155_price_action_learning.py b/tests/test_v23_0_155_price_action_learning.py
+--- a/tests/test_v23_0_155_price_action_learning.py
++++ b/tests/test_v23_0_155_price_action_learning.py
+@@ -72,3 +72,28 @@
+     assert packet["performance_validation"] == "NOT_YET_EVALUATED"
+ 
+ 
++def test_shared_direction_relation_counts_each_brain_once():
++    frame = pd.DataFrame([
++        {"open": 100, "high": 105, "low": 95, "close": 101},
++        {"open": 97, "high": 104, "low": 96, "close": 103},
++    ])
++    packet = build_price_action_packet(
++        candles=frame,
++        analyses={"advanced_structure": {"trend": "BULLISH", "state": "NO_BREAK", "events": []}},
++        shared_records=[
++            {"source_brain": "scout", "direction": "BULLISH", "knowledge_type": "scan"},
++            {"source_brain": "scout", "direction": "BULLISH", "knowledge_type": "learning"},
++            {"source_brain": "scout", "direction": "BULLISH", "knowledge_type": "structure"},
++            {"source_brain": "central_brain", "direction": "BEARISH"},
++            {"source_brain": "autopilot", "direction": "BEARISH"},
++        ],
++    )
++    assert packet["shared_context"]["record_count"] == 5
++    assert packet["shared_context"]["aligned_directional_records"] == 1
++    assert packet["shared_context"]["conflicting_directional_records"] == 2
++    assert packet["shared_context"]["structure_relation"] == "CONFLICTING"
++    assert packet["signal_or_risk_effect"] is False
++
++
+ def test_price_action_brain_publishes_and_reads_shared_context(tmp_path, monkeypatch):
