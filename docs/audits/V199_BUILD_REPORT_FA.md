@@ -10,15 +10,15 @@
 - مصرف context در Central Brain، Historical Market Brain، Scout، Price Action و AutoPilot.
 - عدم انتشار شناسه معامله، fills و PnL خام.
 - PAPER ONLY؛ بدون تغییر scoring، ranking، confidence، risk یا order behavior.
-- بنر install.bat از نسخه قدیمی V23.0.152 به V23.0.199 اصلاح شد.
-- تست قرارداد نسخه اکنون نسخهٔ installer را نیز کنترل می‌کند.
+- بنر install.bat به V23.0.199 اصلاح شد.
+- تست قرارداد نسخه اکنون backend، launcher، README و install.bat را کنترل می‌کند.
 
-## آزمون
-- 92 passed, 1 skipped در مجموعهٔ هدفمند (2.32 ثانیه).
-- py_compile فایل‌های تغییرکرده موفق.
-- 1,076 فایل Manifest با صفر مغایرت checksum.
-- ZIP integrity سالم.
-- کل suite تکمیل نشد: Flask در محیط نصب نبود و نصب آنلاین در دسترس نبود.
+## آخرین راستی‌آزمایی
+- 95 passed, 1 skipped در مجموعهٔ هدفمند.
+- py_compile برای 9 فایل Python تغییرکرده موفق.
+- 1,125 فایل Manifest با صفر مغایرت checksum.
+- ZIP integrity و sidecar SHA-256 سالم.
+- Patch dry-run موفق.
 
 ## محدودیت
-این تغییر اشتراک شواهد است؛ آموزش وزن مدل یا اثبات سودآوری نیست. اجرای runtime روی دستگاه کاربر هنوز لازم است.
+کل suite در این محیط تکمیل نشد؛ Flask نصب نبود و اجرای گستردهٔ باقی‌مانده از محدودیت زمان گذشت. این تغییر اشتراک شواهد است، نه آموزش وزن مدل یا اثبات سودآوری. اجرای runtime روی دستگاه کاربر هنوز لازم است.
