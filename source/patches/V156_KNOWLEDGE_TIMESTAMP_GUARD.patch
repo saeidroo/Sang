@@ -1,0 +1,72 @@
+--- a/backend/knowledge_bus.py
++++ b/backend/knowledge_bus.py
+@@ -113,8 +113,15 @@
+     confidence_value = _finite(confidence)
+     if confidence_value is not None and not 0.0 <= confidence_value <= 1.0:
+         return {"stored": False, "reason": "confidence_out_of_range"}
++    now = time.time()
+     timestamp = _finite(observed_at)
+-    timestamp = timestamp if timestamp is not None and timestamp > 0 else time.time()
++    timestamp = timestamp if timestamp is not None and timestamp > 0 else now
++    # Prevent a producer clock/unit error from pinning a packet in the future:
++    # future-dated rows bypass age filters and block later valid upserts.
++    if timestamp > now + 300:
++        return {"stored": False, "reason": "observed_at_in_future"}
++    if timestamp > now:
++        timestamp = now
+ 
+     direction_value = str(direction or "UNKNOWN").strip().upper()
+@@ -131,7 +138,6 @@
+     if len(encoded.encode("utf-8")) > _MAX_PAYLOAD_BYTES:
+         return {"stored": False, "reason": "payload_too_large"}
+ 
+-    now = time.time()
+     try:
+         with _LOCK:
+             con = _connect()
+--- a/tests/test_v23_0_154_brain_knowledge_bus.py
++++ b/tests/test_v23_0_154_brain_knowledge_bus.py
+@@ -1,8 +1,16 @@
+ """V23.0.154 shared brain knowledge: storage and advisory-only integration."""
+ 
++import pytest
++
+ from backend import knowledge_bus
+ 
+ 
++@pytest.fixture(autouse=True)
++def _freeze_knowledge_bus_clock(monkeypatch):
++    # Test packets use deterministic synthetic Unix timestamps.
++    monkeypatch.setattr(knowledge_bus.time, "time", lambda: 1_800_001_000.0)
++
++
+ def _record(symbol='BTCUSDT', source='scout_fusion', market='spot', timeframe='1h',
+             observed_at=1_800_000_000, direction='up', confidence=0.8, payload=None):
+     return knowledge_bus.publish_knowledge(
+@@ -216,3 +224,26 @@
+         'spot_only', 'perp_only', 'historical_validation'}
+ 
+ 
++def test_future_timestamp_cannot_pin_evidence_or_block_valid_updates(tmp_path, monkeypatch):
++    monkeypatch.setattr(knowledge_bus, '_db_path', lambda: tmp_path / 'knowledge.sqlite3')
++    now = 1_800_000_100.0
++    monkeypatch.setattr(knowledge_bus.time, 'time', lambda: now)
++
++    rejected = _record(source='clock_skewed', observed_at=now + 301,
++                       payload={'version': 'future'})
++    assert rejected['stored'] is False
++    assert rejected['reason'] == 'observed_at_in_future'
++    assert knowledge_bus.knowledge_status()['records'] == 0
++
++    clamped = _record(source='slight_skew', observed_at=now + 30,
++                      payload={'version': 'slight_future'})
++    assert clamped['stored'] is True
++    assert clamped['observed_at'] == now
++
++    valid = _record(source='clock_skewed', observed_at=now,
++                    payload={'version': 'valid'})
++    assert valid['stored'] is True
++    rows = knowledge_bus.recall_knowledge(
++        'BTCUSDT', market='spot', timeframe='1h', max_age_seconds=60)
++    assert {row['source_brain'] for row in rows} == {'clock_skewed', 'slight_skew'}
++    assert next(row for row in rows if row['source_brain'] == 'clock_skewed')['payload']['version'] == 'valid'
