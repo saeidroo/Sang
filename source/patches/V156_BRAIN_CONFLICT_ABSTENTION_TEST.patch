@@ -1,0 +1,31 @@
+--- a/tests/test_v23_0_155_price_action_learning.py
++++ b/tests/test_v23_0_155_price_action_learning.py
+@@ -154,3 +154,28 @@
+     assert packet["shared_context"]["conflicting_directional_records"] == 2
+     assert packet["shared_context"]["structure_relation"] == "CONFLICTING"
+     assert packet["signal_or_risk_effect"] is False
++
++
++def test_conflicting_packets_from_same_brain_are_preserved_but_abstain_from_vote():
++    frame = pd.DataFrame([
++        {"open": 100, "high": 105, "low": 95, "close": 101},
++        {"open": 97, "high": 104, "low": 96, "close": 103},
++    ])
++    packet = build_price_action_packet(
++        candles=frame,
++        analyses={"advanced_structure": {"trend": "BULLISH", "state": "NO_BREAK", "events": []}},
++        shared_records=[
++            {"source_brain": "scout", "direction": "BULLISH", "timeframe": "15m"},
++            {"source_brain": "scout", "direction": "BEARISH", "timeframe": "1h"},
++            {"source_brain": "central_brain", "direction": "BULLISH"},
++            {"source_brain": "autopilot", "direction": "BEARISH"},
++        ],
++    )
++    context = packet["shared_context"]
++    assert context["record_count"] == 4
++    assert context["sources"] == ["autopilot", "central_brain", "scout"]
++    # Scout has contradictory packets, so it contributes no directional vote.
++    assert context["aligned_directional_records"] == 1
++    assert context["conflicting_directional_records"] == 1
++    assert context["structure_relation"] == "MIXED_OR_EQUAL"
++    assert packet["signal_or_risk_effect"] is False
