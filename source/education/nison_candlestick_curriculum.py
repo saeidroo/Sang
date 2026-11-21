@@ -8,7 +8,26 @@ from typing import Any, Dict, List, Sequence
 
 SOURCE = {"author": "Steve Nison", "title": "Japanese Candlestick Charting Techniques",
           "edition": "Second Edition", "curriculum_id": "NISON_CANDLE_EVIDENCE_V1",
-          "mode": "SHADOW_ADVISORY_ONLY"}
+          "mode": "SHADOW_ADVISORY_ONLY",
+          "source_file": "Steve_Nison_Japanese_Candlestick_Charting_Techniques_Prentice_Hall.pdf"}
+
+# Source-inspected details from OCR-checked scan pages; concise original paraphrase.
+INSPECTED_LESSONS = {
+    3: {
+        "printed_pages": "25-28",
+        "rules": [
+            "The real body is the open-to-close interval; its direction distinguishes a higher close from a lower close.",
+            "Upper and lower shadows extend from the real body to the session high and low.",
+            "A long white body depicts buyer control during that completed period; a long black body depicts seller control.",
+            "Real-body size is a momentum clue; expanding bodies during a decline indicate strengthening bearish momentum.",
+            "A spinning top after an extended directional move warns of weakening control, not a confirmed reversal.",
+            "A doji has an open and close that are equal or nearly equal; interpret it as indecision and require context.",
+            "Candles are valid on intraday, daily and weekly intervals; interpret each candle using its own interval.",
+            "A candle warning gains context when it coincides with meaningful support or resistance."
+        ],
+        "evidence_pages": ["PDF 36-39; printed 25-28"]
+    }
+}
 
 LESSONS = [
  {"chapter":3,"topic":"Candle construction","printed_pages":"23-30","rules":["Read open, high, low and close together.","Separate real body from upper and lower shadows.","Use only completed candles; the close is a completed-bar observation."]},
@@ -42,7 +61,7 @@ def _mid(x): return (x["open"]+x["close"])/2.0
 def _result(name: str, direction: str, start: int, end: int, bars: Sequence[Dict[str,float]], confirmation: str, invalidation: float, note: str) -> Dict[str,Any]:
     nxt=bars[end+1] if end+1 < len(bars) else None
     confirmed=False
-    if nxt is not None:
+    if nxt is not None and direction in {"bullish", "bearish"}:
         confirmed = (nxt["close"] > max(bars[end]["open"],bars[end]["close"]) if direction=="bullish"
                      else nxt["close"] < min(bars[end]["open"],bars[end]["close"]))
     return {"pattern":name,"direction":direction,"formation_index":[start,end],
@@ -63,7 +82,12 @@ def analyze_candles(rows: Sequence[Dict[str,Any]], trend: str="unknown") -> Dict
     evidence=[]
     for i,x in enumerate(bars):
         rng=x["range"]
-        if rng<=0 or x["body"]<=0: continue
+        if rng<=0: continue
+        if x["body"] <= rng * 0.05:
+            evidence.append(_result("doji", "neutral", i, i, bars, "Wait for the next completed candle and evaluate location/context.", x["low"], "Near-equal open and close; indecision, not a standalone reversal."))
+            continue
+        if x["body"] <= rng * 0.35:
+            evidence.append(_result("spinning_top", "neutral", i, i, bars, "Treat as a warning only; seek follow-through or structural confirmation.", x["low"], "Small real body; may indicate weakening directional control."))
         small=x["body"]<=rng*0.35
         tiny_up=x["upper"]<=max(x["body"]*0.25,rng*0.03)
         tiny_low=x["lower"]<=max(x["body"]*0.25,rng*0.03)
