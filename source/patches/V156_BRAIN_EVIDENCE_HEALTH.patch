@@ -1,0 +1,79 @@
+--- a/backend/knowledge_bus.py
++++ b/backend/knowledge_bus.py
+@@ -236,21 +236,42 @@
+                 source_last_seen = {str(row[0]): float(row[1]) for row in con.execute(
+                     "SELECT source_brain, MAX(observed_at) FROM brain_knowledge GROUP BY source_brain")
+                     if row[1] is not None}
++                source_dimensions = {str(row[0]): {
++                    "symbols": int(row[1]), "timeframes": int(row[2]),
++                    "knowledge_types": int(row[3])
++                } for row in con.execute("""SELECT source_brain,
++                    COUNT(DISTINCT symbol), COUNT(DISTINCT timeframe),
++                    COUNT(DISTINCT knowledge_type) FROM brain_knowledge GROUP BY source_brain""")}
+                 latest = con.execute("SELECT MAX(observed_at) FROM brain_knowledge").fetchone()[0]
+             finally:
+                 con.close()
+         now = time.time()
+-        active_sources = sorted(source for source, seen_at in source_last_seen.items()
+-                                 if 0 <= now - seen_at <= 300)
++        recent_sources = sorted(source for source, seen_at in source_last_seen.items()
++                                if 0 <= now - seen_at <= 300)
++        source_health = {}
++        for source, seen_at in source_last_seen.items():
++            age = max(0.0, now - seen_at)
++            source_health[source] = {
++                "evidence_state": "recent" if age <= 300 else "stale",
++                "last_evidence_age_seconds": round(age, 1),
++                "records": by_source.get(source, 0),
++                **source_dimensions.get(source, {"symbols": 0, "timeframes": 0, "knowledge_types": 0}),
++            }
+         return {"available": True, "schema_version": SCHEMA_VERSION,
+                 "records": total, "by_source": by_source,
+                 "source_last_seen": source_last_seen,
+-                "active_sources": active_sources,
++                # Compatibility alias: these are recent evidence publishers, not worker heartbeats.
++                "active_sources": recent_sources,
++                "recent_evidence_sources": recent_sources,
++                "source_health": source_health,
++                "activity_semantics": "recent_evidence_publication_not_worker_heartbeat",
+                 "active_window_seconds": 300,
+                 "latest_observed_at": float(latest) if latest is not None else None,
+                 "mode": "LATEST_EVIDENCE_PER_BRAIN", "advisory_only": True}
+     except Exception as exc:
+         return {"available": False, "schema_version": SCHEMA_VERSION,
+                 "records": 0, "by_source": {}, "source_last_seen": {},
+-                "active_sources": [], "active_window_seconds": 300,
++                "active_sources": [], "recent_evidence_sources": [], "source_health": {},
++                "activity_semantics": "recent_evidence_publication_not_worker_heartbeat",
++                "active_window_seconds": 300,
+                 "error": str(exc)[:180], "advisory_only": True}
+--- a/frontend/app.js
++++ b/frontend/app.js
+@@ -1494,11 +1494,11 @@
+     put('brainPendingCount',Number(f.pending||0).toLocaleString('fa-IR'));
+     const knowledgeCount=Number(kb.records||0);
+     const knowledgeSources=Object.keys(kb.by_source||{}).length;
+-    const activeKnowledgeSources=Array.isArray(kb.active_sources)?kb.active_sources.length:0;
++    const recentEvidenceSources=Array.isArray(kb.recent_evidence_sources)?kb.recent_evidence_sources.length:(Array.isArray(kb.active_sources)?kb.active_sources.length:0);
+     const knowledgeAge=kb.latest_observed_at?Math.max(0,Date.now()/1000-Number(kb.latest_observed_at)):Infinity;
+     const knowledgeLabel=!kb.available?'حافظه مشترک در دسترس نیست'
+-      :knowledgeCount===0?'منتظر اولین تبادل دانش'
+-      :`${activeKnowledgeSources.toLocaleString('fa-IR')} فعال از ${knowledgeSources.toLocaleString('fa-IR')} مغز · ${knowledgeCount.toLocaleString('fa-IR')} بسته${knowledgeAge>300?' · آخرین تبادل قدیمی':''}`;
++      :knowledgeCount===0?'منتظر اولین تبادل شواهد؛ هنوز سابقه‌ای ثبت نشده'
++      :`${recentEvidenceSources.toLocaleString('fa-IR')} منبع با شواهد تازه از ${knowledgeSources.toLocaleString('fa-IR')} منبع · ${knowledgeCount.toLocaleString('fa-IR')} بسته${knowledgeAge>300?' · آخرین تبادل قدیمی':''} · این شاخص ضربان پردازشگر نیست`;
+     put('brainKnowledgeStatus',knowledgeLabel);
+ 
+     const inv=h.archive_inventory||{}, tf=inv.timeframes||{};
+--- a/tests/test_v23_0_154_brain_knowledge_bus.py
++++ b/tests/test_v23_0_154_brain_knowledge_bus.py
+@@ -74,6 +74,11 @@
+     assert status['records'] == 2
+     assert status['active_window_seconds'] == 300
+     assert status['active_sources'] == ['scout']
++    assert status['recent_evidence_sources'] == ['scout']
++    assert status['activity_semantics'] == 'recent_evidence_publication_not_worker_heartbeat'
++    assert status['source_health']['scout']['evidence_state'] == 'recent'
++    assert status['source_health']['scout']['records'] == 1
++    assert status['source_health']['historical_market_brain']['evidence_state'] == 'stale'
+     assert status['source_last_seen']['historical_market_brain'] == 1_799_999_000
+ 
